@@ -1,0 +1,2 @@
+id,type,severity,patterns,clause,priority
+G01,诱导好评,high,好评返现|五星好评返钱,EVAL_4.2,1

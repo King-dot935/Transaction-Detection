@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商客对话监测 · 自主输入</title>
+<style>
+  :root{--ink:#111214;--muted:#5F6367;--paper:#fff;--wash:#FBFAF6;--soft:#DDD9D0;
+        --lime:#E9F27B;--lime-line:#C9D65A;--orange:#C2410C;--green:#157F3D;--blue:#2B5CE6}
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{margin:0;background:#F1EFE9;color:var(--ink);
+       font:400 14px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;padding:26px 30px 40px}
+  header{max-width:1240px;margin:0 auto 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.4px}
+  .sub{font-size:12.5px;color:var(--muted)}
+  .badge{margin-left:auto;font-size:11.5px;font-weight:700;padding:4px 12px;border-radius:999px;
+         border:1.5px solid var(--ink);background:var(--paper)}
+  .badge.on{background:var(--lime)}
+  .widepanel{max-width:1240px;margin:16px auto 0;padding:0 20px}
+  .wrap{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:start}
+  @media(max-width:980px){.wrap{grid-template-columns:1fr}}
+  .panel{background:var(--paper);border:1.5px solid var(--ink);border-radius:14px;overflow:hidden}
+  .panel-h{padding:11px 16px;border-bottom:1.5px solid var(--ink);font-weight:800;font-size:13px;
+           display:flex;justify-content:space-between;align-items:center}
+  .panel-h span{font-weight:400;font-size:11.5px;color:var(--muted)}
+  .body{padding:14px 16px}
+  textarea{width:100%;min-height:76px;border:1.5px solid var(--ink);border-radius:10px;padding:11px 12px;
+           font:inherit;font-size:13.5px;resize:vertical;background:var(--wash)}
+  textarea:focus{outline:2px solid var(--lime)}
+  .btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  button{font:inherit;font-size:13px;font-weight:700;padding:9px 15px;border-radius:10px;
+         border:1.5px solid var(--ink);background:var(--paper);cursor:pointer}
+  button.primary{background:var(--lime)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:9px}
+  /* 结果 */
+  .result{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+  .rc{border:1.5px solid var(--ink);border-radius:12px;padding:12px 13px;background:var(--wash)}
+  .rc.hit{border-color:var(--orange);background:#FFF4EC}
+  .rc.ok{border-color:var(--green);background:#F1F8F3}
+  .rc .k{font-size:10.5px;font-weight:800;letter-spacing:.1em;color:var(--muted)}
+  .rc .v{font-size:16px;font-weight:800;margin-top:5px}
+  .rc .d{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.55}
+  .verdict{margin-top:12px;border:1.5px solid var(--ink);border-radius:12px;padding:11px 13px;
+           font-size:12.5px;background:var(--lime);font-weight:700;display:none}
+  .verdict.show{display:block}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.06em;color:var(--muted);font-weight:800;
+     padding:6px 8px;border-bottom:1.5px solid var(--ink)}
+  td{padding:7px 8px;border-bottom:1px dashed var(--soft);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 8px;border-radius:999px;
+       border:1.5px solid var(--ink)}
+  .tag.hit{background:#FFF4EC;border-color:var(--orange);color:var(--orange)}
+  .tag.pass{background:#F1F8F3;border-color:var(--green);color:var(--green)}
+  .stat{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .s{border:1.5px solid var(--ink);border-radius:11px;padding:9px 11px;background:var(--paper)}
+  .s .n{font-size:20px;font-weight:800;letter-spacing:-.5px}
+  .s .l{font-size:11px;color:var(--muted)}
+  .rvitem{border:1.5px solid var(--ink);border-radius:11px;padding:10px 11px;margin-bottom:8px;background:var(--paper)}
+  .rvtext{font-size:12.5px;line-height:1.55}
+  .rvwhy{font-size:10.5px;color:var(--orange);margin-top:4px}
+  .rvbtns{display:flex;gap:7px;margin-top:8px}
+  .rvbtns button{font-size:11.5px;padding:5px 11px;border-radius:8px}
+  .bars{margin-top:10px}
+
+  /* 待复核列表：内部滚动，最多占 380px */
+  .rvscroll{max-height:430px;overflow-y:auto;overscroll-behavior:contain;
+            padding-right:4px;scrollbar-gutter:stable}
+  .rvscroll::-webkit-scrollbar{width:8px}
+  .rvscroll::-webkit-scrollbar-track{background:var(--wash);border-radius:999px}
+  .rvscroll::-webkit-scrollbar-thumb{background:#C9C4B8;border-radius:999px}
+  .rvscroll::-webkit-scrollbar-thumb:hover{background:#A9A296}
+  /* 到底部时给个渐隐，暗示下面还有内容 */
+  .rvwrap{position:relative}
+  .rvfoot{font-size:10.5px;color:var(--muted);text-align:center;padding:6px 0 0}
+  .ltier{border:1.5px solid var(--ink);border-radius:9px;padding:7px 9px;margin-top:6px;font-size:11px}
+  .ltier b{font-weight:800}
+  .ltier .m{color:var(--muted);margin-top:2px}
+  .ltier.bad{border-color:#E4E1D9;background:var(--wash)}
+  .brow{display:flex;align-items:center;gap:8px;font-size:11.5px;margin:5px 0}
+  .brow .lab{width:112px;color:var(--muted)}
+  .brow .tr{flex:1;height:7px;background:#EDEAE2;border-radius:999px;overflow:hidden;
+            border:1px solid #DAD6CC}
+  .brow .tr i{display:block;height:100%;background:var(--ink)}
+
+  /* ===== 移动端适配（390px 实测无横向溢出，这里补体验）===== */
+  @media(max-width:520px){
+    html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+    body{padding-left:12px;padding-right:12px}
+    /* iOS 聚焦输入框会放大页面，除非字号 ≥16px */
+    input,textarea,select{font-size:16px!important}
+    .btn,.q,button{min-height:40px}
+    /* 长串英文/链接不换行会撑破布局 */
+    .bub,.txt,.law,.item .text,.m .f{overflow-wrap:anywhere}
+  }
+
+  @media(max-width:520px){
+    .badge{margin-left:0}
+    .rpanel,.panel{border-radius:12px}
+    .body{padding:10px}
+    .stat{grid-template-columns:1fr 1fr}
+    .s .n{font-size:18px}
+    .brow .lab{width:88px;font-size:11px}
+    /* 表格横向可滚，不撑破页面 */
+    .panel .body table{display:block;overflow-x:auto;white-space:nowrap}
+  }
+
+  /* ===== 统一顶栏（三页共用 · 固定吸顶）===== */
+  .topnav{position:fixed;top:0;left:0;right:0;z-index:80;background:#F1EFE9;
+          border-bottom:1.5px solid #111214}
+  .tn-inner{max-width:1220px;margin:0 auto;display:flex;align-items:center;gap:12px;
+            padding:10px 24px;height:56px;flex-wrap:nowrap}
+  .tn-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;
+            letter-spacing:-.3px;color:#111214;text-decoration:none;white-space:nowrap}
+  .tn-brand .mark{width:24px;height:24px;border-radius:7px;background:#111214;color:#fff;
+                  font-size:11px;display:flex;align-items:center;justify-content:center;flex:0 0 24px}
+  .tn-tabs{display:flex;gap:6px;margin-left:8px}
+  .tn-tabs a{font-size:12.5px;font-weight:700;padding:6px 13px;border:1.5px solid #111214;
+             border-radius:999px;background:#fff;color:#111214;text-decoration:none;white-space:nowrap}
+  .tn-tabs a.on{background:#E9F27B}
+  .tn-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .tn-note{font-size:11.5px;color:#5F6367;white-space:nowrap}
+  body{padding-top:68px}
+  @media(max-width:640px){
+    .tn-inner{height:auto;padding:9px 12px;gap:8px;flex-wrap:wrap}
+    .tn-brand{font-size:14px}
+    .tn-tabs{width:100%;margin-left:0;gap:5px}
+    .tn-tabs a{flex:1;text-align:center;padding:7px 6px}
+    .tn-right{margin-left:0}
+    body{padding-top:112px}
+  }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <div class="tn-inner">
+    <a class="tn-brand" href="/"><span class="mark">商</span>商客对话监测</a>
+    <nav class="tn-tabs">
+      <a href="/">会话判定</a>
+      <a href="/lab" class="on">自主输入</a>
+      <a href="/review">审核管理</a>
+    </nav>
+    <div class="tn-right"><span class="badge" id="llmbadge">大模型：未配置</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div>
+    <div class="panel">
+      <div class="panel-h">输入一句商家话术 <span id="srchint"></span></div>
+      <div class="body">
+        <textarea id="text" placeholder="例如：可以给你退，你先把差评删了"></textarea>
+        <div class="btns">
+          <button class="primary" id="judge">判定这句</button>
+          <button id="sample">随机来一条</button>
+          <button id="batch">批量 20 条并统计</button>
+        </div>
+        <div class="hint">随机样本来自 17 个话术模板 + 9 条正常话术，每次内容都不一样；
+          批量跑会写入统计，用于看命中率。</div>
+
+        <div class="result" id="result" style="display:none">
+          <div class="rc" id="rc-rule">
+            <div class="k">规则引擎</div><div class="v" id="rule-type">—</div>
+            <div class="d" id="rule-detail"></div>
+          </div>
+          <div class="rc" id="rc-llm">
+            <div class="k">大模型</div><div class="v" id="llm-type">未配置</div>
+            <div class="d" id="llm-detail"></div>
+          </div>
+        </div>
+        <div class="verdict" id="verdict"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-h" style="background:var(--lime)">待人工复核 <span id="rvc"></span></div>
+      <div class="body" style="padding:10px 12px">
+        <div class="rvscroll" id="rvscroll"><div id="rvlist"></div></div>
+        <div class="rvfoot" id="rvfoot"></div>
+        <div class="hint" style="margin-top:8px">判不了的不猜、也不放行——挂在这里等人裁决。
+          裁决结果会写回判定记录，成为下一轮的标注。</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="panel-h">累计统计 <span>自动落库</span></div>
+      <div class="body">
+
+      <div class="stat">
+        <div class="s"><div class="n" id="s-total">0</div><div class="l">累计判定</div></div>
+        <div class="s"><div class="n" id="s-hit">0%</div><div class="l">规则命中率</div></div>
+        <div class="s"><div class="n" id="s-acc">—</div><div class="l">介入决策一致率</div></div>
+        <div class="s"><div class="n" id="s-agree">—</div><div class="l">规则与模型一致率</div></div>
+      </div>
+      <div class="bars" id="split"></div>
+      <div class="bars" id="bars"></div>
+      <div class="hint" id="llmnote"></div>
+      <div class="hint" id="cachenote"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <div class="panel-h">模型接入 <span id="llmstat">检测中…</span></div>
+      <div class="body">
+
+        <div class="kv"><span class="k">小模型 · 简单问题</span><span class="v" id="llm-small">—</span></div>
+        <div class="kv"><span class="k">大模型 · 复杂问题</span><span class="v" id="llm-large">—</span></div>
+        <button id="llmtest" style="width:100%;margin-top:9px">用一句样本测试两层</button>
+        <div id="llmout" style="margin-top:8px"></div>
+        <div class="hint" style="margin-top:8px">没配置时判定只走规则；配置后按分流层自动调用。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="widepanel">
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-h">最近判定记录 <span id="rowcount"></span></div>
+      <div class="body" style="padding:8px 10px;max-height:300px;overflow:auto">
+        <table><thead><tr><th>话术</th><th>规则</th><th>模型</th></tr></thead>
+        <tbody id="rows"></tbody></table>
+      </div>
+    </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let busy = false;
+
+function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function refresh(){
+  const r = await fetch('/api/labstats').then(x => x.json());
+  const s = r.stats;
+  $('s-total').textContent = s.total;
+  $('s-hit').textContent = Math.round(s.rule_hit_rate * 100) + '%';
+  $('s-acc').textContent = s.truth_checked ? Math.round(s.decision_accuracy * 100) + '%' : '—';
+
+  const pct = v => Math.round((v || 0) * 100) + '%';
+  $('split').innerHTML = `
+    <div class="brow"><span class="lab">照规则说法写</span>
+      <span class="tr"><i style="width:${(s.acc_covered||0)*100}%"></i></span>
+      <span>${pct(s.acc_covered)} <em style="font-style:normal;color:#8a9199">n=${s.acc_covered_n||0}</em></span></div>
+    <div class="brow"><span class="lab">换了说法</span>
+      <span class="tr"><i style="width:${(s.acc_paraphrase||0)*100}%"></i></span>
+      <span>${pct(s.acc_paraphrase)} <em style="font-style:normal;color:#8a9199">n=${s.acc_paraphrase_n||0}</em></span></div>`;
+  $('s-agree').textContent = s.agree_rate ? Math.round(s.agree_rate * 100) + '%' : '—';
+  $('llmbadge').textContent = r.llm_ready ? '大模型：已接入' : '大模型：未配置';
+  $('llmbadge').className = 'badge' + (r.llm_ready ? ' on' : '');
+  $('llmnote').textContent = r.llm_ready ? ''
+    : '未配置大模型：设置 LLM_PROVIDER=http、LLM_BASE、LLM_KEY 后，右侧会出现模型判定与一致率。';
+
+  const rows = r.rows || [];
+  $('rowcount').textContent = rows.length + ' 条';
+  $('rows').innerHTML = rows.slice(0, 20).map(x => `
+    <tr><td>${esc(x.text)}</td>
+      <td>${x.rule_hit ? `<span class="tag hit">${esc(x.rule_type)}</span>` : '<span class="tag pass">不介入</span>'}</td>
+      <td>${x.llm_hit === null ? '<span style="color:#8a9199">—</span>'
+            : x.llm_hit ? `<span class="tag hit">${esc(x.llm_type)}</span>` : '<span class="tag pass">不介入</span>'}</td>
+    </tr>`).join('');
+
+  loadReview();
+
+  const bt = s.by_type || {};
+  const max = Math.max(1, ...Object.values(bt));
+  $('bars').innerHTML = Object.entries(bt).slice(0, 6).map(([k, v]) => `
+    <div class="brow"><span class="lab">${esc(k)}</span>
+      <span class="tr"><i style="width:${v/max*100}%"></i></span><span>${v}</span></div>`).join('');
+}
+
+async function loadReview(){
+  const r = await fetch('/api/review').then(x => x.json());
+  $('rvc').textContent = (r.pending || 0) + ' 条待处理';
+  const rows = r.rows || [];
+  $('rvlist').innerHTML = rows.length ? rows.map(x => `
+    <div class="rvitem">
+      <div class="rvtext">${esc(x.text)}</div>
+      <div class="rvwhy">${esc(x.reason)}</div>
+      <div class="rvbtns">
+        <button class="primary" onclick="decide(${x.id},'approve')">确认介入</button>
+        <button onclick="decide(${x.id},'reject')">放行</button>
+      </div>
+    </div>`).join('') : '<div class="hint">没有待复核的样本</div>';
+  const foot = document.getElementById('rvfoot');
+  if (foot) foot.textContent = rows.length > 4 ? ('列表可上下滚动 · 共 ' + rows.length + ' 条') : '';
+}
+
+async function decide(id, action){
+  const r = await fetch('/api/review', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id: id, action: action, reviewer: '审核员'})
+  }).then(x => x.json());
+  if (!r.ok) alert(r.message);
+  loadReview(); refresh();
+}
+
+function showResult(res){
+  $('result').style.display = 'grid';
+  const rule = res.rule;
+  $('rc-rule').className = 'rc ' + (rule.hit ? 'hit' : 'ok');
+  $('rule-type').textContent = rule.hit ? rule.type : '不介入';
+  $('rule-detail').textContent = rule.hit
+    ? `命中「${rule.matched}」· 规则 ${rule.rule_id} · 严重度 ${rule.severity}`
+    : '负向抑制或未命中任何规则';
+
+  const m = res.llm;
+  $('rc-llm').className = 'rc ' + (m ? (m.hit ? 'hit' : 'ok') : '');
+  if (!m) { $('llm-type').textContent = '未配置'; $('llm-detail').textContent = '设置 LLM_PROVIDER 后这里显示模型判定'; }
+  else if (m.error) { $('llm-type').textContent = '调用失败'; $('llm-detail').textContent = m.error; }
+  else {
+    $('llm-type').textContent = m.hit ? m.type : '不介入';
+    $('llm-detail').textContent = (m.reason || '') + (m.confidence ? ` · 置信 ${m.confidence}` : '');
+  }
+
+  const v = $('verdict');
+  if (res.truth) {
+    const okRule = (rule.hit ? rule.type : null) === res.truth;
+    v.className = 'verdict show';
+    v.textContent = `这是随机样本，真实类型：${res.truth || '正常沟通'} ｜ 规则判定${okRule ? '正确' : '错误'}`;
+  } else if (res.agree !== null && res.agree !== undefined) {
+    v.className = 'verdict show';
+    v.textContent = res.agree ? '规则与模型结论一致' : '规则与模型结论不一致——这种分歧最值得看';
+  } else { v.className = 'verdict'; }
+}
+
+async function act(url, body){
+  if (busy) return; busy = true;
+  try {
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+                               body: JSON.stringify(body || {})}).then(x => x.json());
+    return r;
+  } finally { busy = false; }
+}
+
+$('judge').onclick = async () => {
+  const text = $('text').value.trim();
+  if (!text) { $('text').focus(); return; }
+  const res = await act('/api/judge', {text});
+  showResult(res); refresh();
+};
+
+$('sample').onclick = async () => {
+  const r = await fetch('/api/sample').then(x => x.json());
+  $('text').value = r.text;
+  $('srchint').textContent = '真实类型：' + (r.truth || '正常沟通');
+  $('text').focus();
+};
+
+$('batch').onclick = async () => {
+  $('batch').disabled = true; $('batch').textContent = '跑 20 条…';
+  const r = await act('/api/batch', {n: 20});
+  $('batch').disabled = false; $('batch').textContent = '批量 20 条并统计';
+  if (r.samples && r.samples.length) showResult(r.samples[0]);
+  refresh();
+};
+
+/* ===== 模型接入 ===== */
+async function loadCache(){
+  try {
+    const d = await fetch('/api/cache/stats').then(x => x.json());
+    const el = document.getElementById('cachenote');
+    if (!el) return;
+    el.innerHTML = '缓存：' + d.total + ' 条可用 · 已复用 <b>' + d.saved_calls + '</b> 次' +
+      (d.stale ? ' · ' + d.stale + ' 条因规则更新失效' : '');
+  } catch(e) {}
+}
+
+async function loadLLM(){
+  try {
+    const r = await fetch('/api/llm/status').then(x => x.json());
+    const t = r.tiers || {};
+    for (const k of ['small', 'large']){
+      const el = document.getElementById('llm-' + k);
+      if (!el) continue;
+      const v = t[k] || {};
+      el.textContent = v.configured ? ('已接入 · ' + (v.model || '?')) : '未配置';
+      el.style.color = v.configured ? '#157F3D' : '#5F6367';
+    }
+    const n = ['small','large'].filter(k => (t[k]||{}).configured).length;
+    const st = document.getElementById('llmstat');
+    if (st) st.textContent = n ? (n + ' / 2 层已接入') : '未接入';
+    const badge = document.getElementById('llmbadge');
+    if (badge) badge.textContent = n ? ('模型：' + n + '/2 层') : '大模型：未配置';
+  } catch(e) {
+    const st = document.getElementById('llmstat');
+    if (st) st.textContent = '检测失败';
+  }
+}
+
+const llmBtn = document.getElementById('llmtest');
+if (llmBtn) llmBtn.onclick = async () => {
+  const out = document.getElementById('llmout');
+  llmBtn.disabled = true; llmBtn.textContent = '测试中…';
+  try {
+    const r = await fetch('/api/llm/test', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text: '可以给你退，你先把差评删了'})
+    }).then(x => x.json());
+    const label = {small: '千问', large: 'DeepSeek'};
+    out.innerHTML = ['small','large'].map(k => {
+      const v = (r.tiers || {})[k] || {};
+      if (!v.ok) return `<div class="ltier bad"><b>${label[k]}</b> · 未接通<div class="m">${esc(v.error || '')}</div></div>`;
+      return `<div class="ltier"><b>${label[k]}</b> · ${esc(v.ms)} ms
+        <div class="m">判为「${esc(v.hit ? v.type : '不介入')}」· 置信 ${esc(v.confidence)} · ${esc(v.model || '')}</div></div>`;
+    }).join('');
+  } catch(e) {
+    out.innerHTML = '<div class="ltier bad">测试请求失败<div class="m">' + esc(e.message) + '</div></div>';
+  }
+  llmBtn.disabled = false; llmBtn.textContent = '用一句样本测试两层';
+};
+
+loadLLM();
+loadCache();
+refresh();
+</script>
+</body>
+</html>

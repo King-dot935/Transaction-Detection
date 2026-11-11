@@ -1,0 +1,2 @@
+{"id":"R16","type":"诱导评价","severity":"high","patterns":["给个五星我给你退"],"clause":"EVAL_4.2","priority":1}
+{"id":"R17","type":"","severity":"超严重","patterns":[],"clause":"NOT_EXIST"}

@@ -1,0 +1,17 @@
+# Render 部署配置（免费档）
+# 用法：把 demo_dazhu 目录推到 GitHub → Render 里 New Blueprint → 选这个仓库
+services:
+  - type: web
+    name: sentinel-demo
+    runtime: docker
+    plan: free
+    region: singapore          # 离国内近一点
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: READONLY
+        value: "1"             # 只读部署，防止公开环境被写入
+      - key: SEED
+        value: "1"             # 首次启动自动灌演示数据
+      - key: PORT
+        value: "8080"

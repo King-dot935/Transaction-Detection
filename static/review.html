@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商客对话监测 · 审核管理</title>
+<style>
+  :root{--ink:#111214;--muted:#5F6367;--paper:#fff;--wash:#FBFAF6;--soft:#DDD9D0;
+        --lime:#E9F27B;--lime-line:#C9D65A;--orange:#C2410C;--orange-bg:#FFF4EC;
+        --green:#157F3D;--green-bg:#F1F8F3}
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{margin:0;background:#F1EFE9;color:var(--ink);
+       font:400 14px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+       padding:0 0 34px}
+
+  /* ===== 统一顶栏（三页共用 · 固定吸顶）===== */
+  .topnav{position:fixed;top:0;left:0;right:0;z-index:80;background:#F1EFE9;
+          border-bottom:1.5px solid #111214}
+  .tn-inner{max-width:1220px;margin:0 auto;display:flex;align-items:center;gap:12px;
+            padding:10px 24px;height:56px;flex-wrap:nowrap}
+  .tn-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;
+            letter-spacing:-.3px;color:#111214;text-decoration:none;white-space:nowrap}
+  .tn-brand .mark{width:24px;height:24px;border-radius:7px;background:#111214;color:#fff;
+                  font-size:11px;display:flex;align-items:center;justify-content:center;flex:0 0 24px}
+  .tn-tabs{display:flex;gap:6px;margin-left:8px}
+  .tn-tabs a{font-size:12.5px;font-weight:700;padding:6px 13px;border:1.5px solid #111214;
+             border-radius:999px;background:#fff;color:#111214;text-decoration:none;white-space:nowrap}
+  .tn-tabs a.on{background:#E9F27B}
+  .tn-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .tn-right input{font:inherit;font-size:12.5px;padding:6px 11px;border:1.5px solid #111214;
+                  border-radius:8px;background:#fff;width:120px;color:#111214}
+  .tn-right input:focus{outline:2px solid #E9F27B}
+  body{padding-top:68px}
+
+  .page{max-width:1220px;margin:0 auto;padding:0 24px}
+
+  /* ===== 队列条 ===== */
+  .queue{margin-top:14px;border:1.5px solid var(--ink);border-radius:14px;background:var(--paper);
+         overflow:hidden}
+  .queue-h{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1.5px solid var(--ink);
+           font-weight:800;font-size:12.5px}
+  .queue-h .n{background:var(--lime);border:1.5px solid var(--ink);border-radius:999px;
+              padding:1px 9px;font-size:11.5px}
+  .queue-h .hint{margin-left:auto;font-weight:400;font-size:11px;color:var(--muted)}
+  .qstrip{display:flex;gap:8px;padding:10px 12px;overflow-x:auto}
+  .qcard{flex:0 0 210px;border:1.5px solid var(--ink);border-radius:10px;padding:9px 10px;
+         background:var(--paper);cursor:pointer;position:relative}
+  .qcard.on{background:var(--lime)}
+  .qcard .t{font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;
+            -webkit-box-orient:vertical;overflow:hidden}
+  .qcard .m{font-size:10px;color:var(--muted);margin-top:5px}
+  .qcard.on .m{color:#3F4A12}
+  .qcard .esc{position:absolute;top:-6px;right:-6px;font-size:9px;font-weight:800;background:var(--orange);
+              color:#fff;border-radius:999px;padding:1px 6px;border:1.5px solid var(--ink)}
+  .qempty{padding:18px;color:var(--muted);font-size:12.5px;text-align:center;width:100%}
+
+  /* ===== 主区：完全对称两栏 ===== */
+  .main{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;align-items:stretch}
+  @media(max-width:880px){.main{grid-template-columns:1fr}}
+  .panel{background:var(--paper);border:1.5px solid var(--ink);border-radius:14px;overflow:hidden;
+         display:flex;flex-direction:column;min-width:0}
+  .panel-h{padding:10px 14px;border-bottom:1.5px solid var(--ink);font-weight:800;font-size:12.5px;
+           display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .panel-h span{font-weight:400;font-size:11px;color:var(--muted)}
+  .body{padding:13px 14px;flex:1}
+
+  /* 左：证据 */
+  .quote{background:var(--orange-bg);border:1.5px solid var(--orange);border-radius:11px;
+         padding:11px 12px;font-size:13.5px;line-height:1.6}
+  .quote .w{font-size:10px;color:var(--orange);font-weight:700;margin-bottom:3px}
+  .kv{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:7px 0;
+      border-bottom:1px dashed var(--soft)}
+  .kv:last-child{border-bottom:0}
+  .kv .k{color:var(--muted);white-space:nowrap}
+  .kv .v{font-weight:700;text-align:right}
+  .evrow{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 0;
+         border-bottom:1px dashed var(--soft)}
+  .evrow:last-child{border-bottom:0}
+  .evrow .n{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--ink);
+            background:var(--wash);font-size:9.5px;font-weight:800;
+            display:flex;align-items:center;justify-content:center;flex:0 0 17px}
+  .evrow .ok{margin-left:auto;color:var(--green);font-weight:800;font-size:10.5px}
+  .empty{padding:26px 10px;text-align:center;color:var(--muted);font-size:12.5px}
+
+  /* 右：处置 */
+  .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media(max-width:520px){.acts{grid-template-columns:1fr}}
+  .act{border:1.5px solid var(--ink);border-radius:11px;padding:10px 11px;cursor:pointer;
+       background:var(--paper);position:relative}
+  .act.on{background:var(--lime)}
+  .act .t{font-size:12.5px;font-weight:800;line-height:1.35}
+  .act .d{font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+  .act.on .d{color:#3F4A12}
+  .act .badge{position:absolute;top:-7px;right:8px;font-size:9px;font-weight:800;background:var(--ink);
+              color:#fff;border-radius:999px;padding:1px 7px}
+  textarea.note{width:100%;min-height:56px;margin-top:10px;padding:9px 11px;font:inherit;font-size:12.5px;
+                border:1.5px solid var(--ink);border-radius:10px;background:var(--wash);resize:vertical}
+  textarea.note:focus{outline:2px solid var(--lime)}
+  .submit{width:100%;margin-top:10px;padding:11px;font:inherit;font-size:13.5px;font-weight:800;
+          border:1.5px solid var(--ink);border-radius:10px;background:var(--lime);cursor:pointer}
+  .submit:disabled{opacity:.5;cursor:default}
+  .msg{margin-top:10px;border:1.5px solid var(--green);background:var(--green-bg);border-radius:10px;
+       padding:9px 11px;font-size:12px;line-height:1.55;display:none}
+  .msg.show{display:block}
+  .hist{margin-top:14px;border-top:1.5px dashed var(--soft);padding-top:2px}
+  .hrow{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin:6px 0 3px}
+  .hrow b{color:var(--ink)}
+  .hbar{height:7px;background:#EDEAE2;border:1px solid #DAD6CC;border-radius:999px;overflow:hidden}
+  .hbar i{display:block;height:100%;background:var(--ink)}
+
+  /* ===== 底部：指标与处置记录 ===== */
+  .bottom{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;align-items:start}
+  @media(max-width:880px){.bottom{grid-template-columns:1fr}}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .st{border:1.5px solid var(--ink);border-radius:10px;padding:9px 10px}
+  .st .n{font-size:16px;font-weight:800;letter-spacing:-.4px}
+  .st .l{font-size:10px;color:var(--muted)}
+  .mini{border:1.5px solid var(--soft);border-radius:10px;padding:9px 10px;margin-bottom:7px;background:var(--paper)}
+  .mini .h{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;font-weight:800}
+  .mini .b{font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.5}
+  .sec-t{font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--muted);margin:11px 0 6px}
+  .sec-t:first-child{margin-top:0}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(16px);
+         background:var(--ink);color:#fff;font-size:12.5px;font-weight:700;padding:9px 16px;
+         border-radius:999px;opacity:0;pointer-events:none;transition:.2s;z-index:90;max-width:80vw}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+
+  @media(max-width:640px){
+    .tn-inner{height:auto;padding:9px 12px;gap:8px;flex-wrap:wrap}
+    .tn-brand{font-size:14px}
+    .tn-tabs{width:100%;margin-left:0;gap:5px}
+    .tn-tabs a{flex:1;text-align:center;padding:7px 6px}
+    .tn-right{margin-left:0;width:100%}
+    body{padding-top:112px}
+    .page{padding:0 12px}
+    .qcard{flex-basis:170px}
+    .stats{grid-template-columns:1fr 1fr}
+    input,textarea{font-size:16px!important}
+  }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <div class="tn-inner">
+    <a class="tn-brand" href="/"><span class="mark">商</span>商客对话监测</a>
+    <nav class="tn-tabs">
+      <a href="/">会话判定</a>
+      <a href="/lab">自主输入</a>
+      <a href="/review" class="on">审核管理</a>
+    </nav>
+    <div class="tn-right">
+      <input id="adminToken" type="password" placeholder="管理 Token（公网必填）" aria-label="管理 Token">
+      <input id="reviewer" value="审核员" aria-label="审核人">
+    </div>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- 队列条 -->
+  <div class="queue">
+    <div class="queue-h">
+      <span>待人工复核</span><span class="n" id="cnt">0</span>
+      <span class="hint">点一张卡片开始裁决</span>
+    </div>
+    <div class="qstrip" id="qstrip"><div class="qempty">加载中…</div></div>
+  </div>
+
+  <!-- 对称主区 -->
+  <div class="main">
+    <div class="panel">
+      <div class="panel-h"><span>证据</span><span id="caseid">—</span></div>
+      <div class="body" id="evidence"><div class="empty">左侧队列里选一条</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h"><span>处置</span><span id="cur">未选择</span></div>
+      <div class="body">
+        <div class="acts" id="acts">
+          <div class="act on" data-preset="refund" data-action="approve">
+            <span class="badge">推荐</span>
+            <div class="t">确认介入 · 退款并处罚</div>
+            <div class="d">订单转纠纷、退款原路退回、冻结结算、按违规次数处罚</div>
+          </div>
+          <div class="act" data-preset="warn" data-action="approve">
+            <div class="t">确认介入 · 仅警告</div>
+            <div class="d">订单转纠纷，不自动退款，处罚封顶「警告」</div>
+          </div>
+          <div class="act" data-preset="fp" data-action="reject">
+            <div class="t">放行 · 标记误报</div>
+            <div class="d">不处置交易，样本进规则候选池供修正</div>
+          </div>
+          <div class="act" data-preset="escalate" data-action="escalate">
+            <div class="t">转专家复核</div>
+            <div class="d">不结案，留在队列并打上「已升级」标记</div>
+          </div>
+        </div>
+
+        <textarea class="note" id="note"
+          placeholder="写一句判断依据，会随介入单留档（选填）"></textarea>
+        <button class="submit" id="submit" disabled>先选一条待复核记录</button>
+        <div class="msg" id="msg"></div>
+        <div class="hist" id="hist"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部 -->
+  <div class="bottom">
+    <div class="panel">
+      <div class="panel-h"><span>指标口径</span><span>分子 / 分母可核对</span></div>
+      <div class="body"><div class="stats" id="stats"><div class="empty">加载中…</div></div>
+        <div class="sec-t" style="margin-top:12px">数据范围</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.6" id="scope"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h"><span>裁决之后</span><span id="after-n"></span></div>
+      <div class="body" id="after"><div class="empty">还没有裁决记录</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = v => (v == null ? '—' : Math.round(v * 100) + '%');
+$('adminToken').value = sessionStorage.getItem('sentinelAdminToken') || '';
+
+let QUEUE = [], CUR = null, PRESET = 'refund', ACTION = 'approve', MV = 0;
+let REVIEW_TRACE = 'review-' + Date.now().toString(36), REVIEW_OPENED = false;
+
+function track(event, properties, traceId){
+  fetch('/api/events', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    keepalive: true,
+    body: JSON.stringify({
+      event, trace_id: traceId || REVIEW_TRACE, schema_version: 1,
+      properties: properties || {}
+    })
+  }).catch(() => {});
+}
+
+function toast(m){
+  const t = $('toast'); t.textContent = m; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ---------- 队列 ---------- */
+async function loadQueue(){
+  const r = await fetch('/api/review?status=pending').then(x => x.json());
+  QUEUE = r.rows || [];
+  MV = r.merchant_violations || 0;
+  if (!REVIEW_OPENED) {
+    REVIEW_OPENED = true;
+    track('review_open', {pending: r.pending || 0});
+  }
+  $('cnt').textContent = r.pending || 0;
+  if (!QUEUE.length){
+    $('qstrip').innerHTML = '<div class="qempty">没有待复核样本。去「自主输入」里发几句拿不准的话术试试。</div>';
+    CUR = null; renderEvidence(); syncSubmit();
+    return;
+  }
+  if (!CUR || !QUEUE.some(x => x.id === CUR.id)) CUR = QUEUE[0];
+  $('qstrip').innerHTML = QUEUE.map(x => `
+    <div class="qcard ${CUR && x.id === CUR.id ? 'on' : ''}" data-id="${x.id}">
+      ${x.escalated ? '<span class="esc">已升级</span>' : ''}
+      <div class="t">${esc(x.text)}</div>
+      <div class="m">#${x.id} · ${esc(x.tier || 'rule')}${x.rule_type ? ' · ' + esc(x.rule_type) : ''}</div>
+    </div>`).join('');
+  document.querySelectorAll('.qcard').forEach(el => {
+    el.onclick = () => {
+      CUR = QUEUE.find(x => x.id === Number(el.dataset.id));
+      document.querySelectorAll('.qcard').forEach(c => c.classList.toggle('on', c === el));
+      renderEvidence(); syncSubmit(); renderHist();
+    };
+  });
+  renderEvidence(); syncSubmit(); renderHist();
+}
+
+function renderEvidence(){
+  if (!CUR){
+    $('caseid').textContent = '—';
+    $('evidence').innerHTML = '<div class="empty">左侧队列里选一条</div>';
+    return;
+  }
+  $('caseid').textContent = '#' + CUR.id;
+  $('evidence').innerHTML = `
+    <div class="quote"><div class="w">商家原话 · ${esc(CUR.ts)}</div>「${esc(CUR.text)}」</div>
+
+    <div class="sec-t">判定链路</div>
+    <div class="kv"><span class="k">挂起原因</span><span class="v" style="color:var(--orange)">${esc(CUR.reason)}</span></div>
+    <div class="kv"><span class="k">规则结论</span><span class="v">${esc(CUR.rule_hit ? (CUR.rule_type || '命中') : '未命中')}</span></div>
+    <div class="kv"><span class="k">分流层</span><span class="v">${esc(CUR.tier || 'rule')}</span></div>
+    <div class="kv"><span class="k">模型结论</span><span class="v">${CUR.model_type ? esc(CUR.model_type) + ' · 置信 ' + (CUR.model_conf || 0) : '未配置'}</span></div>
+    ${CUR.escalated ? '<div class="kv"><span class="k">状态</span><span class="v">已转专家，尚未结案</span></div>' : ''}
+
+    <div class="sec-t">证据清单</div>
+    <div class="evrow"><span class="n">1</span>商家原话已定位<span class="ok">已固定</span></div>
+    <div class="evrow"><span class="n">2</span>会话上下文（含前后消息）<span class="ok">已截取</span></div>
+    <div class="evrow"><span class="n">3</span>订单与支付记录<span class="ok">已关联</span></div>
+    <div class="evrow"><span class="n">4</span>商品图片与物流轨迹<span class="ok">待补</span></div>
+
+    <div class="sec-t">相关记录</div>
+    ${CUR.rule_hit ? `
+      <div class="kv"><span class="k">同类话术历史命中</span><span class="v">${CUR.same_type || 0} 次</span></div>
+      <div class="kv"><span class="k">同类已裁决</span><span class="v">${CUR.decided_same || 0} 条</span></div>`
+    : `<div class="kv"><span class="k">同类统计</span><span class="v">规则未命中，无同类可参考</span></div>`}
+    <div class="kv"><span class="k">规则候选池相近</span><span class="v">${CUR.candidates || 0} 条</span></div>
+    <div class="kv"><span class="k">该商家累计违规</span><span class="v">${MV} 次</span></div>`;
+}
+
+/* ---------- 处置 ---------- */
+document.querySelectorAll('.act').forEach(el => {
+  el.onclick = () => {
+    document.querySelectorAll('.act').forEach(a => a.classList.remove('on'));
+    el.classList.add('on');
+    PRESET = el.dataset.preset; ACTION = el.dataset.action;
+    $('cur').textContent = el.querySelector('.t').textContent;
+    syncSubmit();
+  };
+});
+
+function renderHist(){
+  const el = $('hist');
+  if (!el) return;
+  if (!CUR){ el.innerHTML = ''; return; }
+  if (!CUR.rule_hit){
+    el.innerHTML = '<div class="sec-t">同类历史处置</div>' +
+      '<div style="font-size:11.5px;color:var(--muted)">这条没有命中任何规则，' +
+      '属于「新说法」。你这次的判断会成为这一类的第一条样本。</div>';
+    return;
+  }
+  const a = CUR.hist_approve || 0, b = CUR.hist_reject || 0, n = a + b;
+  if (!n){ el.innerHTML = '<div class="sec-t">同类历史处置</div>' +
+    '<div style="font-size:11.5px;color:var(--muted)">这个类型还没有裁决记录，你这条会是第一条。</div>'; return; }
+  const pa = Math.round(a / n * 100);
+  el.innerHTML = `<div class="sec-t">同类历史处置（${n} 条）</div>
+    <div class="hrow"><span>确认介入</span><b>${a}</b></div>
+    <div class="hbar"><i style="width:${pa}%"></i></div>
+    <div class="hrow"><span>放行</span><b>${b}</b></div>
+    <div class="hbar"><i style="width:${100 - pa}%;background:var(--soft)"></i></div>
+    <div style="font-size:10.5px;color:var(--muted);margin-top:6px">
+      同类型 ${esc(CUR.rule_type || '未命中')} 的历史裁决倾向，供保持一致性参考。</div>`;
+}
+
+function syncSubmit(){
+  const b = $('submit');
+  if (!CUR){ b.disabled = true; b.textContent = '先选一条待复核记录'; return; }
+  b.disabled = false;
+  const label = {refund:'确认介入（退款并处罚）', warn:'确认介入（仅警告）',
+                 fp:'放行（标记误报）', escalate:'转专家复核'}[PRESET];
+  b.textContent = label;
+  cur.textContent = {refund:'退款并处罚', warn:'仅警告',
+                          fp:'标记误报', escalate:'转专家'}[PRESET];
+}
+
+$('submit').onclick = async () => {
+  if (!CUR) return;
+  const b = $('submit'); b.disabled = true; b.textContent = '提交中…';
+  const token = $('adminToken').value.trim();
+  if (token) sessionStorage.setItem('sentinelAdminToken', token);
+  else sessionStorage.removeItem('sentinelAdminToken');
+  const headers = {'Content-Type':'application/json'};
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const r = await fetch('/api/review', {
+    method:'POST', headers,
+    body: JSON.stringify({id: CUR.id, action: ACTION, preset: PRESET,
+                          reviewer: $('reviewer').value || '审核员',
+                          note: $('note').value || ''})
+  }).then(x => x.json());
+  $('note').value = '';
+  const m = $('msg'); m.textContent = r.message || (r.ok ? '已处理' : '失败');
+  m.classList.add('show');
+  toast(r.message || '已处理');
+  CUR = null;
+  await Promise.all([loadQueue(), loadStats(), loadAfter()]);
+  syncSubmit();
+};
+
+/* ---------- 指标 ---------- */
+async function loadStats(){
+  const d = await fetch('/api/metrics').then(x => x.json());
+  const ms = d.metrics || [];
+  $('stats').innerHTML = ms.map(x => `
+    <div class="st"><div class="n">${x.key === 'cost' ? (x.value || 0).toFixed(2) : pct(x.value)}</div>
+      <div class="l">${esc(x.name)}</div></div>`).join('');
+  $('scope').textContent = `判定 ${d.scope.judge_logs} 条 · 复核 ${d.scope.review_total} 条` +
+    `（待处理 ${d.scope.review_pending}）· 有标注 ${d.scope.labeled} 条。` + d.scope.note;
+}
+
+/* ---------- 裁决之后 ---------- */
+async function loadAfter(){
+  const d = await fetch('/api/cases').then(x => x.json());
+  const cases = d.cases || [], notifs = d.notifications || [], cands = d.candidates || [];
+  const orders = d.orders || [], m = d.merchant || {};
+  $('after-n').textContent = '介入单 ' + cases.length + ' · 候选 ' + cands.length;
+  if (!cases.length && !orders.length){
+    $('after').innerHTML = '<div class="empty">还没有裁决记录。上面点「确认介入」试试。</div>';
+    return;
+  }
+  let html = '';
+  if (orders.length){
+    const o = orders[0];
+    const st = {shipped:'已发货', dispute:'纠纷处理中', resolved:'已完结'}[o.status] || o.status;
+    const rf = {none:'未申请', processing:'退款处理中', refunded:'已退款'}[o.refund_status] || o.refund_status;
+    html += '<div class="sec-t">这笔交易被怎么处置了</div>' + `
+      <div class="mini">
+        <div class="h"><span>订单 ${esc(o.order_no)}</span><span>¥${o.amount}</span></div>
+        <div class="b">状态 <b>${esc(st)}</b> · 退款 <b>${esc(rf)}</b> ·
+          结算 <b>${o.frozen ? '已冻结' : '正常'}</b> · 商家累计违规 <b>${m.violations || 0}</b> 次</div>
+      </div>`;
+  }
+  if (cases.length){
+    html += '<div class="sec-t">最近介入单</div>' + cases.slice(0, 3).map(c => `
+      <div class="mini"><div class="h"><span>${esc(c.case_no)}</span><span>${esc(c.ts)}</span></div>
+        <div class="b">${esc(c.evidence)}</div></div>`).join('');
+  }
+  if (notifs.length){
+    html += '<div class="sec-t">推给消费者</div>' + notifs.slice(0, 2).map(n => `
+      <div class="mini"><div class="h"><span>${esc(n.title)}</span><span>${esc(n.case_no || '')}</span></div>
+        <div class="b">${esc(n.body)}</div></div>`).join('');
+  }
+  $('after').innerHTML = html;
+}
+
+loadQueue(); loadStats(); loadAfter();
+setInterval(() => { loadQueue(); }, 20000);
+</script>
+</body>
+</html>

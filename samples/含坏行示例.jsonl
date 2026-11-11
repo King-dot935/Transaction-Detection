@@ -1,0 +1,3 @@
+﻿{"id":"J01","type":"诱导好评","severity":"high","patterns":["给个好评返5元"],"clause":"EVAL_4.2"}
+这一行是坏的，故意不闭合
+{"id":"J02","type":"拒绝退货","severity":"mid","patterns":["不能退"],"clause":"RETURN_7.1"}

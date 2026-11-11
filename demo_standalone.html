@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商客对话监测 · 会话判定</title>
+<style>
+  :root{
+    --ink:#111214;--muted:#5F6367;--paper:#fff;--wash:#FBFAF6;--soft:#DDD9D0;
+    --lime:#E9F27B;--lime-line:#C9D65A;--orange:#C2410C;--orange-bg:#FFF4EC;
+    --green:#157F3D;--green-bg:#F1F8F3;
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{margin:0;background:#F1EFE9;color:var(--ink);
+       font:400 14px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+       padding:18px 24px 28px}
+
+  /* ===== 顶栏 ===== */
+  header{max-width:1220px;margin:0 auto 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;letter-spacing:-.3px}
+  .mark{width:24px;height:24px;border-radius:7px;background:var(--ink);color:#fff;font-size:11px;
+        display:flex;align-items:center;justify-content:center}
+  .sub{font-size:12.5px;color:var(--muted)}
+  .nav{margin-left:auto;display:flex;gap:7px}
+  .nav a{font-size:12px;font-weight:700;padding:5px 11px;border:1.5px solid var(--ink);border-radius:999px;
+         background:var(--paper);color:var(--ink);text-decoration:none}
+  .nav a.on{background:var(--lime)}
+
+  /* ===== 工具条 ===== */
+  .toolbar{max-width:1220px;margin:0 auto 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+           background:var(--paper);border:1.5px solid var(--ink);border-radius:12px;padding:9px 11px}
+  select{font:inherit;font-size:13px;padding:7px 10px;border:1.5px solid var(--ink);border-radius:8px;
+         background:var(--paper);max-width:100%}
+  button{font:inherit;font-size:12.5px;font-weight:800;padding:8px 14px;border:1.5px solid var(--ink);
+         border-radius:9px;background:var(--paper);color:var(--ink);cursor:pointer;min-height:38px}
+  button.primary{background:var(--lime)}
+  button:disabled{opacity:.45;cursor:default}
+  .status{font-size:11.5px;color:var(--muted);margin-left:auto}
+  .modes{display:flex;gap:6px}
+  /* 自己输入模式的底部输入栏 */
+  .livebar{display:none;flex-direction:column;gap:8px;padding:10px 14px 12px;
+           border-top:1.5px solid var(--ink);background:var(--paper)}
+  .livebar.show{display:flex}
+  .lchips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .lchips button{padding:5px 11px;font-size:11.5px;font-weight:700;min-height:0;border-radius:999px}
+  .lhint{margin-left:auto;font-size:10.5px;color:var(--muted)}
+  .linput{display:flex;gap:8px;align-items:center}
+  #live-input{flex:1;min-width:0;padding:10px 14px;border:1.5px solid var(--ink);
+              border-radius:999px;font:inherit;font-size:13.5px;background:var(--wash)}
+  #live-input:focus{outline:2px solid var(--lime)}
+  .linput button{border-radius:999px;padding:10px 18px}
+  .miss{border:1.5px dashed var(--soft);border-radius:12px;padding:12px;font-size:12.5px;color:var(--muted)}
+  .miss b{color:var(--ink)}
+
+  /* ===== 两栏 ===== */
+  .wrap{max-width:1220px;margin:0 auto;display:grid;grid-template-columns:1.12fr .88fr;gap:14px;
+        align-items:stretch;min-height:calc(100vh - 200px)}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+  .panel{background:var(--paper);border:1.5px solid var(--ink);border-radius:14px;overflow:hidden;
+          display:flex;flex-direction:column}
+  .panel-h{padding:10px 14px;border-bottom:1.5px solid var(--ink);font-weight:800;font-size:13px;
+           display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .panel-h span{font-weight:400;font-size:11.5px;color:var(--muted)}
+
+  /* 会话 */
+  .chat{padding:14px;min-height:240px;flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px}
+  .day{align-self:center;font-size:10.5px;color:var(--muted);background:var(--wash);
+       border:1px solid var(--soft);padding:1px 10px;border-radius:999px}
+  .msg{max-width:82%;padding:9px 12px;border-radius:13px;font-size:13.5px;line-height:1.6;
+       border:1.5px solid var(--ink);background:var(--paper);word-break:break-word}
+  /* ===== 消息动效 ===== */
+  @keyframes msgIn{
+    from{opacity:0;transform:translateY(10px) scale(.985)}
+    to{opacity:1;transform:none}
+  }
+  @keyframes msgOut{
+    from{opacity:1}
+    to{opacity:0;transform:translateY(-10px) scale(.99)}
+  }
+  @keyframes chatIn{
+    from{opacity:0;transform:translateY(6px)}
+    to{opacity:1;transform:none}
+  }
+  .msg{transition:background .25s ease, border-color .25s ease, color .25s ease}
+  .msg.enter{animation:msgIn .32s cubic-bezier(.2,.7,.3,1) both}
+  .msg.out{animation:msgOut .22s ease-in both}
+  #chat.swap{animation:chatIn .3s ease-out both}
+  @media (prefers-reduced-motion: reduce){
+    .msg.enter,.msg.out,#chat.swap{animation:none}
+  }
+
+  /* 商家在右（深色）、消费者在左（白底黑边）——和真实聊天窗一致 */
+  .msg.merchant{align-self:flex-end;background:var(--ink);color:#fff;border-bottom-right-radius:5px}
+  .msg.user{align-self:flex-start;border-bottom-left-radius:5px}
+  .msg.flag{border-color:var(--orange);background:var(--orange-bg);color:var(--ink)}
+  .msg.flag .who{color:var(--orange)}
+  /* 未播放的占位气泡：深色底会变成白字看不见，强制改用灰字浅底 */
+  .msg.ghost{color:var(--muted)!important;background:var(--paper)!important}
+  .msg.merchant.flag .who{color:var(--orange)}
+  .msg.ghost{opacity:.3;filter:grayscale(1);border-style:dashed}
+  .msg .who{font-size:10px;color:var(--muted);margin-bottom:3px;font-weight:700}
+  .msg.merchant .who{color:#B9C0CC}
+  .msg .badge{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:800;padding:1px 7px;
+              border-radius:999px;background:var(--orange-bg);color:var(--orange);border:1px solid var(--orange)}
+  .turnbar{display:flex;gap:5px;flex-wrap:wrap;padding:0 14px 12px}
+  .dot{width:22px;height:22px;border-radius:6px;border:1px solid var(--soft);font-size:10.5px;
+       display:flex;align-items:center;justify-content:center;color:var(--muted);background:var(--paper)}
+  .dot.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .dot.hit{background:var(--orange);border-color:var(--orange);color:#fff}
+  .legend{font-size:11px;color:var(--muted);padding:0 14px 12px}
+
+  /* ===== 右：判定 ===== */
+  .sentinel{padding:14px;min-height:0;flex:1;overflow:auto}
+  .empty{color:var(--muted);font-size:12.5px;line-height:1.7}
+  .empty b{color:var(--ink)}
+  .kinds{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .kind{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;border:1.5px solid var(--soft);
+        background:var(--wash);color:var(--muted)}
+
+  /* 判定卡 */
+  .card{border:2px solid var(--ink);border-radius:13px;padding:13px;background:var(--paper);margin-bottom:10px}
+  .card.high{border-color:var(--orange)}
+  .kicker{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.07em;
+          background:var(--lime);border:1.5px solid var(--ink);border-radius:999px;padding:2px 9px}
+  .card h3{margin:9px 0 4px;font-size:15px;font-weight:800;letter-spacing:-.2px;line-height:1.35}
+  .quote{background:var(--orange-bg);border:1.5px solid var(--orange);border-radius:9px;padding:9px;
+         font-size:12.5px;margin:8px 0}
+  .quote .w{font-size:10px;color:var(--orange);font-weight:700;margin-bottom:2px}
+  .acts{list-style:none;margin:8px 0 0;padding:0}
+  .acts li{display:flex;gap:8px;font-size:12px;line-height:1.55;margin:6px 0}
+  .acts .n{flex:0 0 17px;height:17px;border-radius:50%;border:1.5px solid var(--ink);
+           font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .btnrow{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+  .btnrow button{flex:0 0 auto}
+  .ticket{background:#0F172A;color:#E2E8F0;padding:11px;border-radius:9px;font-size:11px;
+          white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace;margin-top:9px;display:none;
+          max-height:220px;overflow:auto}
+  .fb{display:flex;gap:7px;align-items:center;margin-top:10px;padding-top:9px;border-top:1px dashed var(--soft);
+      font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+  .fb button{padding:4px 11px;font-size:11.5px;min-height:0;border-radius:7px}
+  .fb .done{color:var(--green);font-weight:700}
+
+  /* 汇总 */
+  .summary{border-top:1.5px solid var(--ink);padding:11px 14px;font-size:11.5px;color:var(--muted)}
+  .srow{display:flex;justify-content:space-between;margin:4px 0}
+  .srow b{color:var(--ink)}
+
+  /* ===== 移动端 ===== */
+  @media(max-width:520px){
+    html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+    body{padding:12px 12px 22px}
+    input,textarea,select{font-size:16px!important}
+    button{min-height:42px}
+    .wrap{min-height:auto}
+    .livebar{padding:9px 11px 11px}
+    .lhint{display:none}
+    .linput button{padding:10px 14px}
+    .chat{min-height:280px;padding:11px}
+    .msg{max-width:88%}
+    .nav{width:100%;margin-left:0}
+    .nav a{flex:1;text-align:center}
+    .status{width:100%;margin-left:0}
+    .msg,.quote,.acts li{overflow-wrap:anywhere}
+  }
+
+  /* ===== 统一顶栏（三页共用 · 固定吸顶）===== */
+  .topnav{position:fixed;top:0;left:0;right:0;z-index:80;background:#F1EFE9;
+          border-bottom:1.5px solid #111214}
+  .tn-inner{max-width:1220px;margin:0 auto;display:flex;align-items:center;gap:12px;
+            padding:10px 24px;height:56px;flex-wrap:nowrap}
+  .tn-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;
+            letter-spacing:-.3px;color:#111214;text-decoration:none;white-space:nowrap}
+  .tn-brand .mark{width:24px;height:24px;border-radius:7px;background:#111214;color:#fff;
+                  font-size:11px;display:flex;align-items:center;justify-content:center;flex:0 0 24px}
+  .tn-tabs{display:flex;gap:6px;margin-left:8px}
+  .tn-tabs a{font-size:12.5px;font-weight:700;padding:6px 13px;border:1.5px solid #111214;
+             border-radius:999px;background:#fff;color:#111214;text-decoration:none;white-space:nowrap}
+  .tn-tabs a.on{background:#E9F27B}
+  .tn-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .tn-note{font-size:11.5px;color:#5F6367;white-space:nowrap}
+  body{padding-top:68px}
+  @media(max-width:640px){
+    .tn-inner{height:auto;padding:9px 12px;gap:8px;flex-wrap:wrap}
+    .tn-brand{font-size:14px}
+    .tn-tabs{width:100%;margin-left:0;gap:5px}
+    .tn-tabs a{flex:1;text-align:center;padding:7px 6px}
+    .tn-right{margin-left:0}
+    body{padding-top:112px}
+  }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <div class="tn-inner">
+    <a class="tn-brand" href="/"><span class="mark">商</span>商客对话监测</a>
+    <nav class="tn-tabs">
+      <a href="/" class="on">会话判定</a>
+      <a href="/lab">自主输入</a>
+      <a href="/review">审核管理</a>
+    </nav>
+    <div class="tn-right"><span class="tn-note">逐句回放 · 逐句判定</span></div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="modes">
+    <button class="primary" id="mode-replay">场景回放</button>
+    <button id="mode-live">自己输入</button>
+  </div>
+  <div id="replay-ctrl" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <select id="scen"></select>
+    <button class="primary" id="next">下一句</button>
+    <button id="reset">重放</button>
+    <button id="play">自动播放</button>
+  </div>
+
+  <span class="status" id="status"></span>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-h"><span>会话</span><span id="sess"></span></div>
+    <div class="chat" id="chat"></div>
+    <div class="turnbar" id="turnbar"></div>
+    <div class="legend" id="legend">深色 = 商家 · 橙色 = 该轮触发介入</div>
+
+    <!-- 自己输入模式的输入栏，贴在聊天区底部 -->
+    <div class="livebar" id="live-ctrl">
+      <div class="lchips">
+        <button id="live-one">随机一句</button>
+        <button id="live-conv">随机一段对话</button>
+        <span class="lhint">回车或点「判定」</span>
+      </div>
+      <div class="linput">
+        <input id="live-input" placeholder="输入一句商家话术，例如：可以给你退，你先把差评删了">
+        <button class="primary" id="live-judge">判定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-h"><span>判定</span><span id="sev"></span></div>
+    <div class="sentinel" id="sentinel">
+      <div class="empty">
+        <b>监测中，暂无提示。</b><br>
+        商家出现下列话术时会在这里插入提醒卡，并给出依据条款与建议动作。
+        <div class="kinds">
+          <span class="kind">拒绝法定权利</span>
+          <span class="kind">以利益换好评</span>
+          <span class="kind">诱导线下交易</span>
+          <span class="kind">威胁或辱骂</span>
+          <span class="kind">索要身份信息</span>
+        </div>
+      </div>
+    </div>
+    <div class="summary" id="summary"></div>
+  </div>
+</div>
+
+<script>window.__EMBEDDED__ = {"list": [{"id": "S01", "title": "特价商品被拒退", "product": "运动鞋", "turns": 6, "expect": {"intervene": true, "type": "拒绝法定权利", "turn": 3}}, {"id": "S02", "title": "拆封一律不退", "product": "蓝牙耳机", "turns": 4, "expect": {"intervene": true, "type": "扩大退货例外", "turn": 1}}, {"id": "S03", "title": "诱导私下转账", "product": "行李箱", "turns": 4, "expect": {"intervene": true, "type": "诱导线下交易", "turn": 1}}, {"id": "S04", "title": "删差评才退款", "product": "电饭煲", "turns": 4, "expect": {"intervene": true, "type": "以利益换好评", "turn": 1}}, {"id": "S05", "title": "投诉后被威胁", "product": "连衣裙", "turns": 4, "expect": {"intervene": true, "type": "威胁或辱骂", "turn": 3}}, {"id": "S06", "title": "质量问题推给物流", "product": "玻璃杯", "turns": 4, "expect": {"intervene": true, "type": "责任推诿", "turn": 1}}, {"id": "S07", "title": "连续三天拖延", "product": "床垫", "turns": 6, "expect": {"intervene": true, "type": "反复拖延", "turn": 5}}, {"id": "S08", "title": "正常咨询发货", "product": "保温杯", "turns": 4, "expect": {"intervene": false, "type": "", "turn": -1}}, {"id": "S09", "title": "正常退换", "product": "卫衣", "turns": 4, "expect": {"intervene": false, "type": "", "turn": -1}}, {"id": "S10", "title": "索要验证码与身份证", "product": "手机", "turns": 4, "expect": {"intervene": true, "type": "索要不必要的身份信息", "turn": 1}}, {"id": "S11", "title": "拒绝开发票", "product": "办公椅", "turns": 4, "expect": {"intervene": true, "type": "拒绝开票", "turn": 1}}, {"id": "S12", "title": "签收即认可", "product": "羽绒服", "turns": 2, "expect": {"intervene": true, "type": "诱导放弃权利", "turn": 1}}], "byId": {"S01": {"scenario": {"id": "S01", "title": "特价商品被拒退", "product": "运动鞋", "expect": {"intervene": true, "type": "拒绝法定权利", "turn": 3}, "turns": [{"role": "user", "text": "你好，我上周买的鞋想退，还没穿过"}, {"role": "merchant", "text": "在的，您说"}, {"role": "user", "text": "想申请七天无理由退货"}, {"role": "merchant", "text": "特价商品不退不换的，这是店铺规定"}, {"role": "user", "text": "可是鞋没穿过，吊牌都在"}, {"role": "merchant", "text": "特价就是不退，这是规定"}]}, "analysis": {"scenario_id": "S01", "title": "特价商品被拒退", "product": "运动鞋", "verdicts": [{"turn": 0, "role": "user", "text": "你好，我上周买的鞋想退，还没穿过", "intervene": false}, {"turn": 1, "role": "merchant", "text": "在的，您说", "intervene": false}, {"turn": 2, "role": "user", "text": "想申请七天无理由退货", "intervene": false}, {"turn": 3, "role": "merchant", "text": "特价商品不退不换的，这是店铺规定", "intervene": true, "rule_id": "R01", "type": "拒绝法定权利", "severity": "mid", "matched": "不退", "clause": "RETURN_7.1", "clause_title": "七天无理由退货的适用范围", "clause_text": "自营商品在签收后 7 日内可申请无理由退货，商品需保持完好、不影响二次销售。", "hint": "除定制、鲜活等法定例外，7 天内可无理由退货；「特价不退」不是合法理由。", "action": "提示权利"}, {"turn": 4, "role": "user", "text": "可是鞋没穿过，吊牌都在", "intervene": false}, {"turn": 5, "role": "merchant", "text": "特价就是不退，这是规定", "intervene": true, "rule_id": "R01", "type": "拒绝法定权利", "severity": "mid", "matched": "不退", "clause": "RETURN_7.1", "clause_title": "七天无理由退货的适用范围", "clause_text": "自营商品在签收后 7 日内可申请无理由退货，商品需保持完好、不影响二次销售。", "hint": "除定制、鲜活等法定例外，7 天内可无理由退货；「特价不退」不是合法理由。", "action": "提示权利"}], "first": {"turn": 3, "role": "merchant", "text": "特价商品不退不换的，这是店铺规定", "intervene": true, "rule_id": "R01", "type": "拒绝法定权利", "severity": "mid", "matched": "不退", "clause": "RETURN_7.1", "clause_title": "七天无理由退货的适用范围", "clause_text": "自营商品在签收后 7 日内可申请无理由退货，商品需保持完好、不影响二次销售。", "hint": "除定制、鲜活等法定例外，7 天内可无理由退货；「特价不退」不是合法理由。", "action": "提示权利"}}}, "S02": {"scenario": {"id": "S02", "title": "拆封一律不退", "product": "蓝牙耳机", "expect": {"intervene": true, "type": "扩大退货例外", "turn": 1}, "turns": [{"role": "user", "text": "耳机收到了，试戴了一下不合适，想退"}, {"role": "merchant", "text": "拆封了就不能退哦"}, {"role": "user", "text": "只是试戴，不算使用吧"}, {"role": "merchant", "text": "拆开就不退，这是公司规定"}]}, "analysis": {"scenario_id": "S02", "title": "拆封一律不退", "product": "蓝牙耳机", "verdicts": [{"turn": 0, "role": "user", "text": "耳机收到了，试戴了一下不合适，想退", "intervene": false}, {"turn": 1, "role": "merchant", "text": "拆封了就不能退哦", "intervene": true, "rule_id": "R02", "type": "扩大退货例外", "severity": "mid", "matched": "拆封了就不能退", "clause": "RETURN_7.3", "clause_title": "已使用商品的退货限制", "clause_text": "退回商品应保持完好，已剪吊牌、已洗涤、缺少配件的商品不支持无理由退货。", "hint": "拆封本身不当然排除无理由退货，只有影响二次销售才受限，需要商家举证。", "action": "提示权利"}, {"turn": 2, "role": "user", "text": "只是试戴，不算使用吧", "intervene": false}, {"turn": 3, "role": "merchant", "text": "拆开就不退，这是公司规定", "intervene": true, "rule_id": "R02", "type": "扩大退货例外", "severity": "mid", "matched": "拆开就不退", "clause": "RETURN_7.3", "clause_title": "已使用商品的退货限制", "clause_text": "退回商品应保持完好，已剪吊牌、已洗涤、缺少配件的商品不支持无理由退货。", "hint": "拆封本身不当然排除无理由退货，只有影响二次销售才受限，需要商家举证。", "action": "提示权利"}], "first": {"turn": 1, "role": "merchant", "text": "拆封了就不能退哦", "intervene": true, "rule_id": "R02", "type": "扩大退货例外", "severity": "mid", "matched": "拆封了就不能退", "clause": "RETURN_7.3", "clause_title": "已使用商品的退货限制", "clause_text": "退回商品应保持完好，已剪吊牌、已洗涤、缺少配件的商品不支持无理由退货。", "hint": "拆封本身不当然排除无理由退货，只有影响二次销售才受限，需要商家举证。", "action": "提示权利"}}}, "S03": {"scenario": {"id": "S03", "title": "诱导私下转账", "product": "行李箱", "expect": {"intervene": true, "type": "诱导线下交易", "turn": 1}, "turns": [{"role": "user", "text": "这个差价怎么补"}, {"role": "merchant", "text": "你加我微信，转账给我，我给你处理"}, {"role": "user", "text": "平台不能补吗"}, {"role": "merchant", "text": "私下转更快，平台要走流程"}]}, "analysis": {"scenario_id": "S03", "title": "诱导私下转账", "product": "行李箱", "verdicts": [{"turn": 0, "role": "user", "text": "这个差价怎么补", "intervene": false}, {"turn": 1, "role": "merchant", "text": "你加我微信，转账给我，我给你处理", "intervene": true, "rule_id": "R03", "type": "诱导线下交易", "severity": "high", "matched": "加我微信", "clause": "TRANS_2.1", "clause_title": "平台内完成交易", "clause_text": "买卖双方的交易与付款应当在平台内完成，商家不得引导消费者通过站外渠道支付。", "hint": "引导脱离平台交易，出了纠纷平台无法保障你的资金和售后。", "action": "立即介入"}, {"turn": 2, "role": "user", "text": "平台不能补吗", "intervene": false}, {"turn": 3, "role": "merchant", "text": "私下转更快，平台要走流程", "intervene": true, "rule_id": "R03", "type": "诱导线下交易", "severity": "high", "matched": "私下转", "clause": "TRANS_2.1", "clause_title": "平台内完成交易", "clause_text": "买卖双方的交易与付款应当在平台内完成，商家不得引导消费者通过站外渠道支付。", "hint": "引导脱离平台交易，出了纠纷平台无法保障你的资金和售后。", "action": "立即介入"}], "first": {"turn": 1, "role": "merchant", "text": "你加我微信，转账给我，我给你处理", "intervene": true, "rule_id": "R03", "type": "诱导线下交易", "severity": "high", "matched": "加我微信", "clause": "TRANS_2.1", "clause_title": "平台内完成交易", "clause_text": "买卖双方的交易与付款应当在平台内完成，商家不得引导消费者通过站外渠道支付。", "hint": "引导脱离平台交易，出了纠纷平台无法保障你的资金和售后。", "action": "立即介入"}}}, "S04": {"scenario": {"id": "S04", "title": "删差评才退款", "product": "电饭煲", "expect": {"intervene": true, "type": "以利益换好评", "turn": 1}, "turns": [{"role": "user", "text": "收到的是坏的，我要退款"}, {"role": "merchant", "text": "可以给你退，你先把差评删了"}, {"role": "user", "text": "我等退款到账再删"}, {"role": "merchant", "text": "删了差评我马上退，不然走流程很慢"}]}, "analysis": {"scenario_id": "S04", "title": "删差评才退款", "product": "电饭煲", "verdicts": [{"turn": 0, "role": "user", "text": "收到的是坏的，我要退款", "intervene": false}, {"turn": 1, "role": "merchant", "text": "可以给你退，你先把差评删了", "intervene": true, "rule_id": "R04", "type": "以利益换好评", "severity": "high", "matched": "差评删", "clause": "EVAL_4.2", "clause_title": "评价的独立性", "clause_text": "不得以退换货、补偿、返现等利益，换取消费者修改或删除评价。", "hint": "以退款为条件要求删差评或改好评，属于干预评价，平台规则禁止。", "action": "立即介入"}, {"turn": 2, "role": "user", "text": "我等退款到账再删", "intervene": false}, {"turn": 3, "role": "merchant", "text": "删了差评我马上退，不然走流程很慢", "intervene": false}], "first": {"turn": 1, "role": "merchant", "text": "可以给你退，你先把差评删了", "intervene": true, "rule_id": "R04", "type": "以利益换好评", "severity": "high", "matched": "差评删", "clause": "EVAL_4.2", "clause_title": "评价的独立性", "clause_text": "不得以退换货、补偿、返现等利益，换取消费者修改或删除评价。", "hint": "以退款为条件要求删差评或改好评，属于干预评价，平台规则禁止。", "action": "立即介入"}}}, "S05": {"scenario": {"id": "S05", "title": "投诉后被威胁", "product": "连衣裙", "expect": {"intervene": true, "type": "威胁或辱骂", "turn": 3}, "turns": [{"role": "user", "text": "你们发错货了，耽误我时间"}, {"role": "merchant", "text": "我们已经处理了"}, {"role": "user", "text": "我要投诉"}, {"role": "merchant", "text": "你投诉也没用，爱要不要"}]}, "analysis": {"scenario_id": "S05", "title": "投诉后被威胁", "product": "连衣裙", "verdicts": [{"turn": 0, "role": "user", "text": "你们发错货了，耽误我时间", "intervene": false}, {"turn": 1, "role": "merchant", "text": "我们已经处理了", "intervene": false}, {"turn": 2, "role": "user", "text": "我要投诉", "intervene": false}, {"turn": 3, "role": "merchant", "text": "你投诉也没用，爱要不要", "intervene": true, "rule_id": "R05", "type": "威胁或辱骂", "severity": "high", "matched": "投诉也没用", "clause": "COMMUNITY_3.4", "clause_title": "沟通行为规范", "clause_text": "商家与消费者沟通时不得使用威胁、辱骂、骚扰等方式施压。", "hint": "对方出现威胁或辱骂，已超出正常售后沟通范围。", "action": "立即介入"}], "first": {"turn": 3, "role": "merchant", "text": "你投诉也没用，爱要不要", "intervene": true, "rule_id": "R05", "type": "威胁或辱骂", "severity": "high", "matched": "投诉也没用", "clause": "COMMUNITY_3.4", "clause_title": "沟通行为规范", "clause_text": "商家与消费者沟通时不得使用威胁、辱骂、骚扰等方式施压。", "hint": "对方出现威胁或辱骂，已超出正常售后沟通范围。", "action": "立即介入"}}}, "S06": {"scenario": {"id": "S06", "title": "质量问题推给物流", "product": "玻璃杯", "expect": {"intervene": true, "type": "责任推诿", "turn": 1}, "turns": [{"role": "user", "text": "收到的杯子裂了"}, {"role": "merchant", "text": "这是物流的问题，找快递去"}, {"role": "user", "text": "外包装是好的，里面是裂的"}, {"role": "merchant", "text": "你签收就代表验收过了，我们没责任"}]}, "analysis": {"scenario_id": "S06", "title": "质量问题推给物流", "product": "玻璃杯", "verdicts": [{"turn": 0, "role": "user", "text": "收到的杯子裂了", "intervene": false}, {"turn": 1, "role": "merchant", "text": "这是物流的问题，找快递去", "intervene": true, "rule_id": "R06", "type": "责任推诿", "severity": "mid", "matched": "物流的问题", "clause": "QUALITY_9.1", "clause_title": "质量问题退货的判定", "clause_text": "商品存在质量问题需提供检测报告或清晰凭证，经审核后可退货或换货。", "hint": "质量问题需要商家举证或检测，不能仅凭「签收即认可」推给物流或消费者。", "action": "提示权利"}, {"turn": 2, "role": "user", "text": "外包装是好的，里面是裂的", "intervene": false}, {"turn": 3, "role": "merchant", "text": "你签收就代表验收过了，我们没责任", "intervene": true, "rule_id": "R06", "type": "责任推诿", "severity": "mid", "matched": "你签收就代表", "clause": "QUALITY_9.1", "clause_title": "质量问题退货的判定", "clause_text": "商品存在质量问题需提供检测报告或清晰凭证，经审核后可退货或换货。", "hint": "质量问题需要商家举证或检测，不能仅凭「签收即认可」推给物流或消费者。", "action": "提示权利"}], "first": {"turn": 1, "role": "merchant", "text": "这是物流的问题，找快递去", "intervene": true, "rule_id": "R06", "type": "责任推诿", "severity": "mid", "matched": "物流的问题", "clause": "QUALITY_9.1", "clause_title": "质量问题退货的判定", "clause_text": "商品存在质量问题需提供检测报告或清晰凭证，经审核后可退货或换货。", "hint": "质量问题需要商家举证或检测，不能仅凭「签收即认可」推给物流或消费者。", "action": "提示权利"}}}, "S07": {"scenario": {"id": "S07", "title": "连续三天拖延", "product": "床垫", "expect": {"intervene": true, "type": "反复拖延", "turn": 5}, "turns": [{"role": "user", "text": "我的退款什么时候到"}, {"role": "merchant", "text": "明天回复"}, {"role": "user", "text": "昨天也说今天回复"}, {"role": "merchant", "text": "在处理了，稍等"}, {"role": "user", "text": "已经三天了"}, {"role": "merchant", "text": "明天回复你"}]}, "analysis": {"scenario_id": "S07", "title": "连续三天拖延", "product": "床垫", "verdicts": [{"turn": 0, "role": "user", "text": "我的退款什么时候到", "intervene": false}, {"turn": 1, "role": "merchant", "text": "明天回复", "intervene": false}, {"turn": 2, "role": "user", "text": "昨天也说今天回复", "intervene": false}, {"turn": 3, "role": "merchant", "text": "在处理了，稍等", "intervene": false}, {"turn": 4, "role": "user", "text": "已经三天了", "intervene": false}, {"turn": 5, "role": "merchant", "text": "明天回复你", "intervene": true, "rule_id": "R07", "type": "反复拖延", "severity": "low", "matched": "明天回复", "clause": "SERVICE_16.1", "clause_title": "客服响应时效", "clause_text": "在线客服工作时间内 3 分钟内响应，非工作时间留言次日处理。", "hint": "对方在反复拖延，建议给出明确时限并保留记录。", "action": "提示"}], "first": {"turn": 5, "role": "merchant", "text": "明天回复你", "intervene": true, "rule_id": "R07", "type": "反复拖延", "severity": "low", "matched": "明天回复", "clause": "SERVICE_16.1", "clause_title": "客服响应时效", "clause_text": "在线客服工作时间内 3 分钟内响应，非工作时间留言次日处理。", "hint": "对方在反复拖延，建议给出明确时限并保留记录。", "action": "提示"}}}, "S08": {"scenario": {"id": "S08", "title": "正常咨询发货", "product": "保温杯", "expect": {"intervene": false, "type": "", "turn": -1}, "turns": [{"role": "user", "text": "请问什么时候发货"}, {"role": "merchant", "text": "今天下午发出，已经安排"}, {"role": "user", "text": "好的谢谢"}, {"role": "merchant", "text": "不客气，有问题随时找我"}]}, "analysis": {"scenario_id": "S08", "title": "正常咨询发货", "product": "保温杯", "verdicts": [{"turn": 0, "role": "user", "text": "请问什么时候发货", "intervene": false}, {"turn": 1, "role": "merchant", "text": "今天下午发出，已经安排", "intervene": false}, {"turn": 2, "role": "user", "text": "好的谢谢", "intervene": false}, {"turn": 3, "role": "merchant", "text": "不客气，有问题随时找我", "intervene": false}], "first": null}}, "S09": {"scenario": {"id": "S09", "title": "正常退换", "product": "卫衣", "expect": {"intervene": false, "type": "", "turn": -1}, "turns": [{"role": "user", "text": "衣服小了一码想换"}, {"role": "merchant", "text": "可以的，帮您登记换货，运费我们承担"}, {"role": "user", "text": "需要我寄回吗"}, {"role": "merchant", "text": "是的，我发您地址，收到后马上给您换"}]}, "analysis": {"scenario_id": "S09", "title": "正常退换", "product": "卫衣", "verdicts": [{"turn": 0, "role": "user", "text": "衣服小了一码想换", "intervene": false}, {"turn": 1, "role": "merchant", "text": "可以的，帮您登记换货，运费我们承担", "intervene": false}, {"turn": 2, "role": "user", "text": "需要我寄回吗", "intervene": false}, {"turn": 3, "role": "merchant", "text": "是的，我发您地址，收到后马上给您换", "intervene": false}], "first": null}}, "S10": {"scenario": {"id": "S10", "title": "索要验证码与身份证", "product": "手机", "expect": {"intervene": true, "type": "索要不必要的身份信息", "turn": 1}, "turns": [{"role": "user", "text": "我的订单退款失败了"}, {"role": "merchant", "text": "需要您提供身份证照片和验证码核实身份"}, {"role": "user", "text": "为什么要验证码"}, {"role": "merchant", "text": "这是流程，不给就处理不了"}]}, "analysis": {"scenario_id": "S10", "title": "索要验证码与身份证", "product": "手机", "verdicts": [{"turn": 0, "role": "user", "text": "我的订单退款失败了", "intervene": false}, {"turn": 1, "role": "merchant", "text": "需要您提供身份证照片和验证码核实身份", "intervene": true, "rule_id": "R08", "type": "索要不必要的身份信息", "severity": "high", "matched": "身份证照片", "clause": "PRIVACY_8.1", "clause_title": "个人信息的必要范围", "clause_text": "商家不得收集与本次交易无关的个人信息，包括验证码、证件照片、银行卡号等。", "hint": "售后不需要验证码、密码或手持身份证，索要这些信息有盗号风险。", "action": "立即介入"}, {"turn": 2, "role": "user", "text": "为什么要验证码", "intervene": false}, {"turn": 3, "role": "merchant", "text": "这是流程，不给就处理不了", "intervene": false}], "first": {"turn": 1, "role": "merchant", "text": "需要您提供身份证照片和验证码核实身份", "intervene": true, "rule_id": "R08", "type": "索要不必要的身份信息", "severity": "high", "matched": "身份证照片", "clause": "PRIVACY_8.1", "clause_title": "个人信息的必要范围", "clause_text": "商家不得收集与本次交易无关的个人信息，包括验证码、证件照片、银行卡号等。", "hint": "售后不需要验证码、密码或手持身份证，索要这些信息有盗号风险。", "action": "立即介入"}}}, "S11": {"scenario": {"id": "S11", "title": "拒绝开发票", "product": "办公椅", "expect": {"intervene": true, "type": "拒绝开票", "turn": 1}, "turns": [{"role": "user", "text": "麻烦开个发票"}, {"role": "merchant", "text": "我们不开票的"}, {"role": "user", "text": "公司报销需要"}, {"role": "merchant", "text": "开不了，都是这个价"}]}, "analysis": {"scenario_id": "S11", "title": "拒绝开发票", "product": "办公椅", "verdicts": [{"turn": 0, "role": "user", "text": "麻烦开个发票", "intervene": false}, {"turn": 1, "role": "merchant", "text": "我们不开票的", "intervene": true, "rule_id": "R10", "type": "拒绝开票", "severity": "mid", "matched": "不开票", "clause": "INVOICE_10.1", "clause_title": "发票开具", "clause_text": "订单完成后可在订单详情页申请电子发票，抬头支持个人或企业。", "hint": "订单完成后可申请电子发票，「开不了」不是合法理由。", "action": "提示权利"}, {"turn": 2, "role": "user", "text": "公司报销需要", "intervene": false}, {"turn": 3, "role": "merchant", "text": "开不了，都是这个价", "intervene": false}], "first": {"turn": 1, "role": "merchant", "text": "我们不开票的", "intervene": true, "rule_id": "R10", "type": "拒绝开票", "severity": "mid", "matched": "不开票", "clause": "INVOICE_10.1", "clause_title": "发票开具", "clause_text": "订单完成后可在订单详情页申请电子发票，抬头支持个人或企业。", "hint": "订单完成后可申请电子发票，「开不了」不是合法理由。", "action": "提示权利"}}}, "S12": {"scenario": {"id": "S12", "title": "签收即认可", "product": "羽绒服", "expect": {"intervene": true, "type": "诱导放弃权利", "turn": 1}, "turns": [{"role": "user", "text": "我想退货"}, {"role": "merchant", "text": "签收就代表认可了，详情页写了概不退换"}]}, "analysis": {"scenario_id": "S12", "title": "签收即认可", "product": "羽绒服", "verdicts": [{"turn": 0, "role": "user", "text": "我想退货", "intervene": false}, {"turn": 1, "role": "merchant", "text": "签收就代表认可了，详情页写了概不退换", "intervene": true, "rule_id": "R09", "type": "诱导放弃权利", "severity": "mid", "matched": "签收就代表认可", "clause": "RETURN_7.1", "clause_title": "七天无理由退货的适用范围", "clause_text": "自营商品在签收后 7 日内可申请无理由退货，商品需保持完好、不影响二次销售。", "hint": "以「详情页写了」「最终解释权」排除法定权利，这类条款不生效。", "action": "提示权利"}], "first": {"turn": 1, "role": "merchant", "text": "签收就代表认可了，详情页写了概不退换", "intervene": true, "rule_id": "R09", "type": "诱导放弃权利", "severity": "mid", "matched": "签收就代表认可", "clause": "RETURN_7.1", "clause_title": "七天无理由退货的适用范围", "clause_text": "自营商品在签收后 7 日内可申请无理由退货，商品需保持完好、不影响二次销售。", "hint": "以「详情页写了」「最终解释权」排除法定权利，这类条款不生效。", "action": "提示权利"}}}}};</script>
+<script>
+let scenarios = [], cur = null, idx = -1, timer = null, currentTrace = '';
+
+const $ = id => document.getElementById(id);
+
+async function boot(){
+  if (window.__EMBEDDED__) {
+    scenarios = window.__EMBEDDED__.list;
+  } else {
+    const r = await fetch('/api/scenarios').then(r=>r.json());
+    scenarios = r.items;
+  }
+  const sel = $('scen');
+  sel.innerHTML = scenarios.map(s =>
+    `<option value="${s.id}">${s.id} ${s.title}（${s.turns} 轮）</option>`).join('');
+  sel.onchange = () => load(sel.value);
+  $('next').onclick = step;
+  $('reset').onclick = () => load(cur.scenario.id);
+  renderSummary();
+  load(scenarios[0].id);
+
+  // 便于截图/演示：?mode=live 直接进实时判定，?try=1 再自动随机一句
+  if (location.search.indexOf('mode=live') > -1){
+    setMode('live');
+    if (location.search.indexOf('try=1') > -1) setTimeout(liveRandom, 400);
+  }
+}
+
+async function load(id){
+  stop();
+  let r;
+  if (window.__EMBEDDED__) { r = window.__EMBEDDED__.byId[id]; }
+  else { r = await fetch('/api/scenario/' + id).then(r=>r.json()); }
+  cur = r; idx = -1;
+  const chat = $('chat');
+  chat.classList.remove('swap');
+  void chat.offsetWidth;          // 重排一次，动画才会重新播
+  chat.classList.add('swap');
+  chat.innerHTML = '<div class="day">今天 14:02</div>' +
+    r.scenario.turns.map((t, i) =>
+      `<div class="msg ${t.role === 'user' ? 'user' : 'merchant'} ghost" id="m${i}">${escapeHtml(t.text)}</div>`
+    ).join('');
+  $('sentinel').innerHTML = '<div class="empty"><b>监测中，暂无提示。</b><br>' +
+    '这一轮还没开始，点「下一句」逐条回放。</div>';
+  $('sev').textContent = '';
+  if (MODE === 'replay'){
+    $('sess').textContent = r.scenario.title + ' · ' + (r.scenario.product||'');
+    $('turnbar').innerHTML = r.scenario.turns.map((_,i)=>
+      `<div class="dot" id="d${i}">${i}</div>`).join('');
+  }
+  $('status').textContent = '共 ' + r.scenario.turns.length + ' 轮';
+  $('next').disabled = false;
+  updateMonitor(0);      // 右侧先给监测状态，不留白
+  step();                // 直接回放第一条，屏幕上立刻有内容
+
+  // 如果用户已经切到「自己输入」，就别把这段对话塞回聊天区
+  if (MODE === 'live'){
+    $('chat').innerHTML = '<div class="day">自己输入 · 实时判定</div>';
+    $('sess').textContent = '实时判定';
+    $('turnbar').innerHTML = '';
+    stopTimer();
+    updateLiveMonitor();
+    $('status').textContent = '输入任意一句商家话术';
+    return;
+  }
+
+  // ?step=4：先停自动播、直接跳到第 4 轮（截图/演示用）
+  const m = location.search.match(/step=(\d+)/);
+  if (m) {
+    for (let k = 1; k < parseInt(m[1], 10); k++) step();
+    stopTimer();
+    $('status').textContent = `第 ${idx + 1} / ${r.scenario.turns.length} 轮`;
+  } else if (MODE === 'replay') {
+    startAuto();          // 默认就自己往下播
+  }
+}
+
+let monitored = 0;
+
+/* 没有命中时的右侧内容：告诉用户"在看什么、看了几条" */
+function updateMonitor(n){
+  monitored = n;
+  if ($('card')) return;                     // 已经有判定卡就不覆盖
+  const total = cur ? cur.scenario.turns.length : 0;
+  $('sentinel').innerHTML = `
+    <div class="empty">
+      <b>监测中 · 已看 ${n} / ${total} 条消息，暂无提示</b><br>
+      商家出现下列话术时，这里会插入提醒卡，并给出依据条款与建议动作。
+      <div class="kinds">
+        <span class="kind">拒绝法定权利</span>
+        <span class="kind">以利益换好评</span>
+        <span class="kind">诱导线下交易</span>
+        <span class="kind">威胁或辱骂</span>
+        <span class="kind">索要身份信息</span>
+      </div>
+    </div>`;
+}
+
+function step(){
+  if(!cur) return;
+  const turns = cur.scenario.turns;
+  if(idx >= turns.length - 1) return stop();
+  idx++;
+  const t = turns[idx];
+  const v = cur.analysis.verdicts[idx];
+  const el = document.getElementById('m' + idx);
+  if (!el) return;
+  el.classList.remove('ghost');
+  el.classList.add('enter');
+  el.addEventListener('animationend', () => el.classList.remove('enter'), { once: true });
+  if (v && v.intervene) el.classList.add('flag');
+  el.innerHTML = `<div class="who">${t.role === 'user' ? '消费者' : '商家'}` +
+    (v && v.intervene ? `<span class="badge">${v.type}</span>` : '') + `</div>${escapeHtml(t.text)}`;
+  const d = $('d' + idx);            // 自己输入模式下没有轮次点，要判空
+  if (d) d.classList.add(v && v.intervene ? 'hit' : 'on');
+
+  if(v && v.intervene) renderVerdict(v, idx);
+  else updateMonitor(idx + 1);
+  $('status').textContent = `第 ${idx+1} / ${turns.length} 轮`;
+
+  if (idx >= turns.length - 1){
+    if (timer){                       // 自动播放中：停顿后切下一段
+      stopTimer();
+      $('status').textContent = `第 ${idx+1} / ${turns.length} 轮 · 本段结束，下一段即将开始`;
+      setTimeout(nextScenario, GAP_MS);
+    }
+  }
+}
+
+function renderVerdict(v, i){
+  currentTrace = 'scenario-' + (cur && cur.scenario ? cur.scenario.id : 'unknown') + '-' + i;
+  track('card_exposure', {rule_id: v.rule_id, type: v.type, severity: v.severity,
+                          position: 'right_panel'});
+  const sevText = {high:'高风险', mid:'中风险', low:'低风险'}[v.severity] || v.severity;
+  $('sev').textContent = '已介入 · ' + sevText;
+  const ticket = {
+    '类型': 'fairness_intervention',
+    '会话': cur.scenario.id,
+    '轮次': i + 1,
+    '规则': v.rule_id,
+    '不公平类型': v.type,
+    '严重度': v.severity,
+    '证据原文': v.text,
+    '命中词': v.matched,
+    '依据条款': v.clause || '平台交易规则',
+    '条款标题': v.clause_title || '',
+    '建议动作': v.action
+  };
+  $('sentinel').innerHTML = `
+    <div class="card ${v.severity}">
+      <div class="kicker">◈ 平台提醒</div>
+      <h3>对方可能侵犯了你的权利</h3>
+      <div class="quote"><div class="w">商家原话 · 第 ${i+1} 轮</div>「${escapeHtml(v.text)}」</div>
+      <ul class="acts">
+        <li><span class="n">1</span><span><b>你可以主张：</b>${escapeHtml(v.hint || '这笔交易的处理不符合平台规则。')}</span></li>
+        ${v.clause ? `<li><span class="n">2</span><span><b>依据条款：</b>《${escapeHtml(v.clause_title)}》${escapeHtml(v.clause)}</span></li>` : ''}
+        <li><span class="n">3</span><span><b>平台可以：</b>${escapeHtml(v.action)}，并把这段对话作为证据固定下来。</span></li>
+      </ul>
+      <div class="btnrow">
+        <button class="primary" onclick="openTicket()">申请平台介入</button>
+        <button onclick="toggleTicket()">查看证据快照</button>
+      </div>
+      <div class="fb" id="fbrow">
+        <span>这个提醒准吗？</span>
+        <button onclick="sendFeedback(1,'${v.rule_id}','${v.type}')">准</button>
+        <button onclick="sendFeedback(0,'${v.rule_id}','${v.type}')">误报</button>
+      </div>
+      <div class="ticket" id="ticket">${escapeHtml(JSON.stringify(ticket, null, 2))}</div>
+    </div>`;
+}
+
+function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function sendFeedback(useful, ruleId, type){
+  const row = $('fbrow');
+  if (!row) return;
+  if (window.__EMBEDDED__) {
+    row.innerHTML = '<span class="done">已记录（离线模式不落库）</span>';
+    return;
+  }
+  try {
+    const r = await fetch('/api/feedback', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({scenario_id: cur.scenario.id, turn: idx,
+                            rule_id: ruleId, type: type, useful: !!useful,
+                            trace_id: currentTrace})
+    }).then(r => r.json());
+    const s = r.stats || {};
+    row.innerHTML = '<span class="done">已记录 · 累计反馈 ' + (s.n||0) +
+      ' 条，误报率 ' + Math.round((s.false_positive_rate||0)*100) + '%</span>';
+  } catch(e) {
+    row.innerHTML = '<span style="color:#C2410C">反馈失败：' + e.message + '</span>';
+  }
+}
+
+function openTicket(){
+  track('card_click_intervene', {action: 'open_ticket'});
+  const t = $('ticket');
+  t.style.display = 'block';
+  $('sev').textContent = '已提交介入申请';
+}
+
+function toggleTicket(){
+  const el = $('ticket');
+  if (el.style.display !== 'block') track('card_evidence_open', {action: 'toggle_ticket'});
+  el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+
+function track(event, properties){
+  if (!currentTrace || window.__EMBEDDED__) return;
+  fetch('/api/events', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    keepalive: true,
+    body: JSON.stringify({
+      event, trace_id: currentTrace, schema_version: 1,
+      session_id: cur && cur.scenario ? cur.scenario.id : '',
+      properties: properties || {}
+    })
+  }).catch(() => {});
+}
+
+function renderSummary(){
+  const all = scenarios;
+  let hit = 0, byType = {};
+  if (window.__EMBEDDED__) {
+    all.forEach(s => {
+      const a = window.__EMBEDDED__.byId[s.id].analysis;
+      if (a.first) {
+        hit++;
+        byType[a.first.type] = (byType[a.first.type]||0)+1;
+      }
+    });
+    const rows = Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,3)
+      .map(([k,v])=>`<div class="srow"><span>${k}</span><b>${v}</b></div>`).join('');
+    $('summary').innerHTML = `<div class="srow"><span>标注会话</span><b>${all.length} 段</b></div>
+      <div class="srow"><span>触发介入</span><b>${hit} 段</b></div>
+      <div class="srow"><span>未触发</span><b>${all.length-hit} 段</b></div>${rows}`;
+  } else {
+    const hit = all.filter(x => (x.expect || {}).intervene).length;
+    $('summary').innerHTML = `<div class="srow"><span>标注会话</span><b>${all.length} 段</b></div>
+      <div class="srow"><span>应介入</span><b>${hit} 段</b></div>
+      <div class="srow"><span>不介入</span><b>${all.length - hit} 段</b></div>`;
+  }
+}
+
+/* ===== 自动播放：默认开启，一段放完自动切下一段，循环 ===== */
+const TURN_MS = 1200;      // 每句停留
+const GAP_MS = 1500;       // 两段之间的停顿
+
+function startAuto(){
+  stopTimer();
+  timer = setInterval(() => {
+    if (MODE !== 'replay' || !cur) return;   // 自己输入模式下不自动播
+    if (idx >= cur.scenario.turns.length - 1) return;
+    step();
+  }, TURN_MS);
+  $('play').textContent = '暂停';
+}
+
+function stopTimer(){
+  if(timer){ clearInterval(timer); timer = null; }
+  $('play').textContent = '自动播放';
+}
+
+function stop(){        // 兼容旧调用
+  stopTimer();
+}
+
+function nextScenario(){
+  if (!scenarios.length) return;
+  const i = scenarios.findIndex(x => x.id === (cur && cur.scenario.id));
+  const nxt = scenarios[(i + 1) % scenarios.length];
+
+  // 先让旧消息依次向上淡出，再换新对话
+  const msgs = document.querySelectorAll('#chat .msg');
+  msgs.forEach((m, k) => {
+    m.style.animationDelay = (k * 18) + 'ms';
+    m.classList.add('out');
+  });
+  setTimeout(() => {
+    $('scen').value = nxt.id;
+    load(nxt.id);        // load 里会重新 startAuto
+  }, 260 + msgs.length * 18);
+}
+
+$('play').addEventListener('click', () => {
+  if (timer) { stopTimer(); $('status').textContent = '已暂停'; }
+  else startAuto();
+});
+
+
+/* ==================== 实时判定模式 ==================== */
+let MODE = 'replay';
+let CATALOG = {};          // rule_id -> {clause_id, clause_title, clause_text}
+
+async function loadCatalog(){
+  try {
+    const r = await fetch('/api/catalog').then(x => x.json());
+    (r.rules || []).forEach(x => { CATALOG[x.id] = x; });
+  } catch(e) { /* 离线时没有也行 */ }
+}
+
+function setMode(m){
+  MODE = m;
+  const live = m === 'live';
+  $('replay-ctrl').style.display = live ? 'none' : 'flex';
+  $('live-ctrl').classList.toggle('show', live);
+  $('mode-replay').className = live ? '' : 'primary';
+  $('mode-live').className = live ? 'primary' : '';
+  $('status').textContent = live ? '输入任意一句商家话术' : '共 6 轮';
+  $('sess').textContent = live ? '实时判定' : '';
+  if (live) { $('turnbar').innerHTML = ''; }
+  $('legend').textContent = live ? '深色 = 商家 · 橙色 = 命中的商家话术'
+                                 : '深色 = 商家 · 橙色 = 该轮触发介入';
+  if (live){
+    stopTimer();
+    if (window.__EMBEDDED__){
+      $('sentinel').innerHTML = '<div class="miss">离线单文件版没有判定服务。' +
+        '<b>运行 demo.py 后</b>刷新页面即可自己输入。</div>';
+      $('chat').innerHTML = '';
+      return;
+    }
+    if (!Object.keys(CATALOG).length) loadCatalog();
+    $('chat').innerHTML = '<div class="day">自己输入 · 实时判定</div>';
+    updateLiveMonitor();
+    $('live-input').focus();
+  } else {
+    const id = cur && cur.scenario ? cur.scenario.id : scenarios[0].id;
+    load(id);
+  }
+}
+
+function updateLiveMonitor(n){
+  if ($('card')) return;
+  $('sentinel').innerHTML = `
+    <div class="empty">
+      <b>实时判定${n ? ' · 已判 ' + n + ' 句' : ''}</b><br>
+      输入一句商家话术，或点「随机一句 / 随机一段对话」。<br>
+      命中会在这里出提醒卡，判不了会进待复核队列。
+      <div class="kinds">
+        <span class="kind">拒绝法定权利</span><span class="kind">以利益换好评</span>
+        <span class="kind">诱导线下交易</span><span class="kind">威胁或辱骂</span>
+        <span class="kind">索要身份信息</span>
+      </div>
+    </div>`;
+}
+
+let liveCount = 0;
+
+function addLive(role, text, flagged){
+  const el = document.createElement('div');
+  el.className = 'msg ' + (role === 'user' ? 'user' : 'merchant') + (flagged ? ' flag' : '');
+  el.innerHTML = `<div class="who">${role === 'user' ? '消费者' : '商家'}</div>${escapeHtml(text)}`;
+  $('chat').appendChild(el);
+  const box = $('chat');
+  if (box.scrollTo) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+  else box.scrollTop = box.scrollHeight;
+}
+
+async function judgeText(text){
+  const r = await fetch('/api/judge', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({text})
+  }).then(x => x.json());
+  liveCount++;
+  addLive('merchant', r.text || text, !!(r.rule && r.rule.hit));
+  if (r.rule && r.rule.hit) renderLiveCard(r);
+  else showMiss(r);
+  return r;
+}
+
+function showMiss(r){
+  $('sev').textContent = r.pending_review ? '待人工复核' : '未介入';
+  $('sentinel').innerHTML = `
+    <div class="miss">
+      <b>这句没有命中规则${r.pending_review ? '，已转人工复核' : '，按正常沟通放行'}。</b><br>
+      分流层：${r.tier || 'rule'}${r.route_reason ? ' · ' + escapeHtml(r.route_reason) : ''}<br>
+      这次判定已写入 <code>judge_logs</code>，可以在「审核管理」里看到。
+    </div>`;
+}
+
+function renderLiveCard(r){
+  const rule = r.rule;
+  const c = CATALOG[rule.rule_id] || {};
+  currentTrace = r.trace_id || ('live-' + Date.now());
+  track('card_exposure', {rule_id: rule.rule_id, type: rule.type,
+                          severity: rule.severity, position: 'right_panel'});
+  $('sev').textContent = '已介入 · ' + (rule.severity === 'high' ? '高风险' : '中风险');
+  $('sentinel').innerHTML = `
+    <div class="card ${rule.severity}">
+      <div class="kicker">◈ 平台提醒</div>
+      <h3>对方可能侵犯了你的权利</h3>
+      <div class="quote"><div class="w">商家原话 · 实时输入</div>「${escapeHtml(r.text || rule.matched)}」</div>
+      <ul class="acts">
+        <li><span class="n">1</span><span><b>你可以主张：</b>${escapeHtml(rule.hint || '该说法不符合平台规则。')}</span></li>
+        ${c.clause_title ? `<li><span class="n">2</span><span><b>依据条款：</b>《${escapeHtml(c.clause_title)}》${escapeHtml(c.clause_id || '')}</span></li>` : ''}
+        <li><span class="n">3</span><span><b>平台可以：</b>${escapeHtml(rule.type)}，并固定这段对话作为证据。</span></li>
+      </ul>
+      <div class="btnrow">
+        <button class="primary" onclick="location.href='/review'">去「审核管理」看这条记录</button>
+      </div>
+      <div class="miss" style="margin-top:9px">
+        命中「${escapeHtml(rule.matched || '')}」· 规则 ${escapeHtml(rule.rule_id || '')} · 分流 ${r.tier || 'rule'}
+        ${r.pending_review ? ' · 同时进了待复核队列' : ''}
+      </div>
+    </div>`;
+}
+
+async function liveSendExample(text){
+  $('chat').innerHTML = '<div class="day">自己输入 · 实时判定</div>';
+  addLive('user', '我要退货');
+  $('chat').appendChild(Object.assign(document.createElement('div'), {className:'day', textContent:'（以下为商家话术）'}));
+  await judgeText(text);
+}
+
+async function liveRandom(){
+  const r = await fetch('/api/sample').then(x => x.json());
+  $('chat').innerHTML = '<div class="day">自己输入 · 实时判定</div>';
+  addLive('user', '我要退货');
+  await judgeText(r.text);
+  $('status').textContent = '随机一句 · 真实类型：' + (r.truth || '正常沟通');
+}
+
+async function liveConversation(){
+  // 3 句随机商家话术 + 2 句消费者，拼成一段对话逐句判定
+  const lines = [];
+  for (let i = 0; i < 3; i++){
+    const s = await fetch('/api/sample').then(x => x.json());
+    lines.push(s.text);
+  }
+  $('chat').innerHTML = '<div class="day">随机生成的一段对话</div>';
+  addLive('user', '你好，我买的电饭煲有问题');
+  for (const t of lines){
+    await judgeText(t);
+    if ($('card')) break;      // 命中一张卡就停，避免刷屏
+    await new Promise(r => setTimeout(r, 200));
+  }
+}
+
+$('mode-replay').onclick = () => setMode('replay');
+$('mode-live').onclick = () => setMode('live');
+$('live-judge').onclick = async () => {
+  const v = $('live-input').value.trim();
+  if (!v) return $('live-input').focus();
+  $('live-input').value = '';
+  $('chat').innerHTML = '<div class="day">自己输入 · 实时判定</div>';
+  addLive('user', '（消费者说了一句）');
+  await judgeText(v);
+  $('status').textContent = '已判 ' + liveCount + ' 句';
+};
+$('live-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('live-judge').click();
+});
+$('live-one').onclick = liveRandom;
+$('live-conv').onclick = liveConversation;
+
+boot();
+</script>
+
+</body>
+</html>

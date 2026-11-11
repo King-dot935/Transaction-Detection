@@ -1,0 +1,4 @@
+id,type,severity,patterns,clause,priority,hint
+R13,诱导修改评价,high,好评返现|五星返现|晒图返钱,EVAL_4.2,1,平台禁止以利益换取评价
+R14,拒绝提供发票,mid,开不了发票|没有发票这一说,INVOICE_10.1,5,不得拒绝开票
+R15,拖延退款,low,再等等|过几天再说,,40,不得无限期拖延

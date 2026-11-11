@@ -1,0 +1,6 @@
+{"id": "RETURN_7", "title": "七天无理由退货", "text": "自营商品在签收后 7 日内，消费者可申请无理由退货，商品需保持完好、不影响二次销售。", "scope": "自营商品", "exceptions": ["定制类", "鲜活易腐类商品不适用。"], "risk_level": "low"}
+{"id": "RETURN_8", "title": "已使用商品的退货", "text": "商品已被使用且影响二次销售的，不适用无理由退货；但商品存在质量问题的除外。", "scope": "全部品类", "exceptions": [], "risk_level": "low"}
+{"id": "FREIGHT_9", "title": "退货运费承担", "text": "因商品质量问题产生的退货运费由商家承担；非质量问题的退货运费由消费者承担，运费险可抵扣。# 第 10 章 评价与发票", "scope": "全部品类", "exceptions": [], "risk_level": "low"}
+{"id": "EVAL_10", "title": "评价的独立性", "text": "商家不得以退换货、补偿、返现等利益，换取消费者修改或删除评价，也不得通过电话、短信骚扰消费者。", "scope": "全部品类", "exceptions": [], "risk_level": "high"}
+{"id": "INVOICE_11", "title": "发票开具", "text": "订单完成后消费者可在订单详情页申请电子发票，商家不得以任何理由拒绝开具。# 第 12 章 交易安全", "scope": "全部品类", "exceptions": [], "risk_level": "low"}
+{"id": "TRANS_12", "title": "平台内完成交易", "text": "买卖双方的沟通与付款应当通过平台完成，商家不得引导消费者添加微信、使用站外支付渠道。", "scope": "全部品类", "exceptions": [], "risk_level": "high"}
