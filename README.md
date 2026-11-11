@@ -1,8 +1,5 @@
 产品概览
-<img width="1280" height="900" alt="input-bar" src="https://github.com/user-attachments/assets/1e90ecd4-6a81-4f0c-be6f-109b91dbec86" />
-<img width="1280" height="700" alt="llm-panel" src="https://github.com/user-attachments/assets/0de23fd8-36db-41ba-bc00-0611828326d6" />
-<img width="1280" height="760" alt="cache-panel" src="https://github.com/user-attachments/assets/19f24138-44a1-4616-8ca3-5880adb623ee" />
-<img width="830" height="900" alt="home-mobile" src="https://github.com/user-attachments/assets/80df53c1-814b-42e9-b400-acd624b62ea0" />
+<img width="1280" height="900" alt="home" src="https://github.com/user-attachments/assets/c3048134-db42-4518-8294-b89abd005f5e" />
 
 
 # 商客对话监测产品需求文档 v2.1
