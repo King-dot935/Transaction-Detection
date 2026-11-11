@@ -1,3 +1,10 @@
+产品概览
+<img width="1280" height="760" alt="cache-panel" src="https://github.com/user-attachments/assets/19f24138-44a1-4616-8ca3-5880adb623ee" />
+<img width="1280" height="900" alt="home" src="https://github.com/user-attachments/assets/17260aa9-a235-4274-aa60-9ab6a8fc758c" />
+<img width="830" height="900" alt="home-mobile" src="https://github.com/user-attachments/assets/80df53c1-814b-42e9-b400-acd624b62ea0" />
+<img width="1280" height="700" alt="llm-panel" src="https://github.com/user-attachments/assets/0de23fd8-36db-41ba-bc00-0611828326d6" />
+<img width="1280" height="900" alt="input-bar" src="https://github.com/user-attachments/assets/1e90ecd4-6a81-4f0c-be6f-109b91dbec86" />
+
 # 商客对话监测产品需求文档 v2.1
 
 > 文档版本：v2.1　|　状态：可用（demo 级）　|　最后更新：2026-11-11
@@ -747,7 +754,8 @@ python demo.py                 # 启动服务（8765）
 python eval_all.py            # 全量评测 + 门禁（退出码即结论）
 python diagnose.py holdout3.jsonl   # 失败归因
 python badcase_cluster.py     # 缺陷聚类
-python check_catalog.py       # 规则/条款一致性
+python check_catalog.py       # 规则![Uploading home-mobile.png…]()
+/条款一致性
 python backup.py              # 备份 + 完整性校验
 python drill_resilience.py    # 熔断三态演练
 python import_library.py samples    # 多格式导入演示
